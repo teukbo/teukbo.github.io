@@ -1,10 +1,10 @@
 {
   "schema": 2,
-  "updated_at": "2026-11-13T14:09+09:00",
+  "updated_at": "2026-11-16T08:10+09:00",
   "period": {
     "from": "2026-09-19T15:00+09:00",
-    "to": "2026-11-11T09:00+09:00",
-    "replays": 212,
+    "to": "2026-11-14T03:00+09:00",
+    "replays": 223,
     "step_hours": 6
   },
   "regions": 226,
@@ -35,9 +35,9 @@
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 6971,
-      "false": 3955,
-      "rate": 0.567
+      "alerts": 7002,
+      "false": 3986,
+      "rate": 0.569
     },
     "high": {
       "alerts": 1061,
@@ -64,9 +64,9 @@
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 1691,
-          "false": 1366,
-          "rate": 0.808
+          "alerts": 1709,
+          "false": 1384,
+          "rate": 0.81
         },
         "high": {
           "alerts": 360,
@@ -79,7 +79,7 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 90292,
+          "cases": 95204,
           "hits": 114,
           "rate": 0.001,
           "event_days": 6
@@ -88,7 +88,7 @@
           "bucket": "1~29% (낮음)",
           "from": 1,
           "to": 29,
-          "cases": 3785,
+          "cases": 3827,
           "hits": 117,
           "rate": 0.031,
           "event_days": 5
@@ -97,9 +97,9 @@
           "bucket": "30~59% (주의)",
           "from": 30,
           "to": 59,
-          "cases": 1331,
+          "cases": 1349,
           "hits": 149,
-          "rate": 0.112,
+          "rate": 0.11,
           "event_days": 6
         },
         {
@@ -131,9 +131,9 @@
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 2938,
-          "false": 1581,
-          "rate": 0.538
+          "alerts": 2951,
+          "false": 1594,
+          "rate": 0.54
         },
         "high": {
           "alerts": 171,
@@ -146,7 +146,7 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 56376,
+          "cases": 60799,
           "hits": 16,
           "rate": 0.0,
           "event_days": 4
@@ -155,18 +155,18 @@
           "bucket": "1~29% (낮음)",
           "from": 1,
           "to": 29,
-          "cases": 35807,
-          "hits": 940,
+          "cases": 36343,
+          "hits": 941,
           "rate": 0.026,
-          "event_days": 16
+          "event_days": 17
         },
         {
           "bucket": "30~59% (주의)",
           "from": 30,
           "to": 59,
-          "cases": 2767,
+          "cases": 2780,
           "hits": 1214,
-          "rate": 0.439,
+          "rate": 0.437,
           "event_days": 19
         },
         {
@@ -213,7 +213,7 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 95820,
+          "cases": 100792,
           "hits": 8,
           "rate": 0.0,
           "event_days": 1
@@ -280,7 +280,7 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 80319,
+          "cases": 85291,
           "hits": 486,
           "rate": 0.006,
           "event_days": 4
@@ -347,7 +347,7 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 143732,
+          "cases": 151190,
           "hits": 0,
           "rate": 0.0,
           "event_days": 0
@@ -414,7 +414,7 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 47912,
+          "cases": 50398,
           "hits": 0,
           "rate": 0.0,
           "event_days": 0
@@ -454,7 +454,7 @@
       "bucket": "0%",
       "from": 0,
       "to": 0,
-      "cases": 514451,
+      "cases": 543674,
       "hits": 624,
       "rate": 0.001,
       "event_days": 12
@@ -463,18 +463,18 @@
       "bucket": "1~29% (낮음)",
       "from": 1,
       "to": 29,
-      "cases": 51675,
-      "hits": 1405,
+      "cases": 52253,
+      "hits": 1406,
       "rate": 0.027,
-      "event_days": 17
+      "event_days": 18
     },
     {
       "bucket": "30~59% (주의)",
       "from": 30,
       "to": 59,
-      "cases": 5910,
+      "cases": 5941,
       "hits": 2291,
-      "rate": 0.388,
+      "rate": 0.386,
       "event_days": 20
     },
     {
