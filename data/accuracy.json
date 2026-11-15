@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-15T23:25+09:00",
+  "updated_at": "2026-11-16T02:25+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-15T23:25+09:00",
-    "runs": 38,
+    "to": "2026-11-16T02:25+09:00",
+    "runs": 39,
     "window_days": 365
   },
   "lead_hours": [
@@ -13,23 +13,23 @@
     24
   ],
   "horizon_hours": 48,
-  "events": 0,
+  "events": 1,
   "capture": {
     "12": {
-      "events": 0,
+      "events": 1,
       "captured": 0,
-      "rate": null
+      "rate": 0.0
     },
     "24": {
-      "events": 0,
+      "events": 1,
       "captured": 0,
-      "rate": null
+      "rate": 0.0
     }
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 15,
-      "false": 15,
+      "alerts": 17,
+      "false": 17,
       "rate": 1.0
     },
     "high": {
@@ -69,23 +69,23 @@
     },
     "strong_wind": {
       "name": "강풍",
-      "events": 0,
+      "events": 1,
       "capture": {
         "12": {
-          "events": 0,
+          "events": 1,
           "captured": 0,
-          "rate": null
+          "rate": 0.0
         },
         "24": {
-          "events": 0,
+          "events": 1,
           "captured": 0,
-          "rate": null
+          "rate": 0.0
         }
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 6,
-          "false": 6,
+          "alerts": 8,
+          "false": 8,
           "rate": 1.0
         },
         "high": {
@@ -96,5 +96,15 @@
       }
     }
   },
-  "recent_events": []
+  "recent_events": [
+    {
+      "region": "L1072100",
+      "hazard": "strong_wind_advisory",
+      "time": "2026-11-16T02:30+09:00",
+      "grades": {
+        "12": "low",
+        "24": "low"
+      }
+    }
+  ]
 }
