@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-15T11:25+09:00",
+  "updated_at": "2026-11-15T14:25+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-15T11:25+09:00",
-    "runs": 34,
+    "to": "2026-11-15T14:25+09:00",
+    "runs": 35,
     "window_days": 365
   },
   "lead_hours": [
@@ -28,9 +28,9 @@
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 0,
-      "false": 0,
-      "rate": null
+      "alerts": 10,
+      "false": 10,
+      "rate": 1.0
     },
     "high": {
       "alerts": 0,
@@ -38,6 +38,63 @@
       "rate": null
     }
   },
-  "by_type": {},
+  "by_type": {
+    "heavy_rain": {
+      "name": "호우",
+      "events": 0,
+      "capture": {
+        "12": {
+          "events": 0,
+          "captured": 0,
+          "rate": null
+        },
+        "24": {
+          "events": 0,
+          "captured": 0,
+          "rate": null
+        }
+      },
+      "false_alarm": {
+        "caution_or_higher": {
+          "alerts": 9,
+          "false": 9,
+          "rate": 1.0
+        },
+        "high": {
+          "alerts": 0,
+          "false": 0,
+          "rate": null
+        }
+      }
+    },
+    "strong_wind": {
+      "name": "강풍",
+      "events": 0,
+      "capture": {
+        "12": {
+          "events": 0,
+          "captured": 0,
+          "rate": null
+        },
+        "24": {
+          "events": 0,
+          "captured": 0,
+          "rate": null
+        }
+      },
+      "false_alarm": {
+        "caution_or_higher": {
+          "alerts": 1,
+          "false": 1,
+          "rate": 1.0
+        },
+        "high": {
+          "alerts": 0,
+          "false": 0,
+          "rate": null
+        }
+      }
+    }
+  },
   "recent_events": []
 }
