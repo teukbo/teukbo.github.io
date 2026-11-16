@@ -85,7 +85,8 @@ class LongCheckTest(unittest.TestCase):
         self.assertIn('"rain_longcheck.json"', (ROOT / "teukbo" / "site.py").read_text(encoding="utf-8"))
         home = (ROOT / "web" / "home.js").read_text(encoding="utf-8")
         self.assertIn('getJson("data/rain_longcheck.json").catch(() => null)', home)  # 없어도 화면은 그대로 뜬다
-        self.assertIn("위 표와 잣대가 다릅니다", home)  # 특보 기준 표와 섞어 읽지 않게
+        self.assertIn("위의 숫자와 잣대가 다릅니다", home)  # 특보 기준 숫자와 섞어 읽지 않게
+        self.assertIn('fold("long-rain"', home)  # 접는 칸 하나에 따로 담는다
 
 
 if __name__ == "__main__":

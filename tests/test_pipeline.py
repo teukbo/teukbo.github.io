@@ -750,6 +750,27 @@ class RailPageTest(unittest.TestCase):
         worker = (self.WEB / "sw.js").read_text(encoding="utf-8")
         self.assertIn('"home.js?v=__BUILD__"', worker)
 
+    def test_first_screen_keeps_the_bottom_short_by_folding_details(self):
+        """지도 아래는 짧게: 과거 검증은 숫자 셋과 한 줄 설명만 보이고 표·방법·한계는 접어 둔다. 바닥글도 한 줄 안내 + 접는 칸. 펼친 칸은 화면을 다시 그려도 유지한다."""
+        html = (self.WEB / "index.html").read_text(encoding="utf-8")
+        script = (self.WEB / "home.js").read_text(encoding="utf-8")
+        style = (self.WEB / "style.css").read_text(encoding="utf-8")
+        proof = script[script.index("function renderProof()"):script.index("// ------------------------------------------------------------ 지도")]
+        self.assertIn("statRow(", proof)
+        for key in ('fold("buckets"', 'fold("types"', 'fold("method"', 'fold("long-rain"'):
+            self.assertIn(key, proof, key)
+        self.assertNotIn('class: "tiles', proof)  # 세로로 쌓이던 큰 칸은 쓰지 않는다
+        self.assertIn("openFolds: new Set()", script)
+        self.assertIn("state.openFolds.has(key)", script)  # 다시 그려도 펼친 채로
+        self.assertIn(".stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))", style)  # 휴대폰에서도 한 줄
+        foot = html[html.index('<footer class="foot">'):html.index("</footer>")]
+        self.assertIn('<details class="fold foot-fold">', foot)
+        visible = foot[:foot.index("<details")] + foot[foot.index("</details>"):]
+        self.assertIn("기상청 날씨누리", visible)  # 공식 특보로 가는 길은 늘 보인다
+        for name in ("Open-Meteo", "OpenStreetMap", "기상청"):  # 출처 표시도 접지 않은 줄에 남긴다
+            self.assertIn(name, visible, name)
+        self.assertIn("CC BY 4.0", foot)
+
     def test_installed_app_opens_in_the_first_screen_colours(self):
         """홈 화면에 추가해 앱처럼 열 때(브라우저 메뉴로 설치): 주소창 없이 열리고, 켜질 때의 바탕이 첫 화면의 밤하늘 색이다. 첫 화면에 설치 안내 칸은 두지 않는다."""
         import json
