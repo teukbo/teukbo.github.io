@@ -876,9 +876,28 @@ table.fit.proof-table tbody th { text-align: left; white-space: nowrap; }
 .proof-notes ul { margin: 8px 0 0; padding-left: 18px; }
 .proof-notes li { margin: 0 0 4px; }
 @media (max-width: 480px) { .proof-tiles { grid-template-columns: 1fr; } .proof-tiles .tile .label { min-height: 0; } }
-/* 호우를 더 긴 기간으로 본 확인: 위 표와 잣대가 달라 선으로 갈라 둔다 */
-.proof-long { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
-.proof-long h3 { margin: 0 0 8px; font-size: 16px; }
+/* 검증 칸: 숫자 셋은 늘 한 줄(휴대폰에서도 세 칸), 표·방법·한계는 접어 둔다 */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 10px; }
+.stat { padding: 10px 8px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255, 255, 255, 0.08); text-align: center; }
+.stat-value { margin: 0; font-size: 24px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stat-label { margin: 3px 0 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.3; word-break: keep-all; }
+.fold { border-top: 1px solid var(--border); }
+.fold > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 46px; padding: 6px 0; cursor: pointer; list-style: none; font-size: 15px; font-weight: 600; word-break: keep-all; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: ""; flex: none; width: 8px; height: 8px; margin: 0 6px 3px 0; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; opacity: 0.7; transform: rotate(45deg); transition: transform 0.15s; }
+.fold[open] > summary::after { margin-bottom: -3px; transform: rotate(-135deg); }
+.fold > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+.fold-body { padding: 2px 0 14px; }
+.fold-body > :first-child { margin-top: 0; }
+.fold-notes { margin: 10px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; }
+.fold-notes li { margin: 0 0 5px; }
+.fold table.fit.proof-table { margin-top: 0; }
+.proof .proof-lede { margin: 0 0 12px; }
+.proof .fold-body .proof-lede { margin: 0 0 10px; }
+.foot-fold { margin-top: 10px; border-bottom: 1px solid var(--border); }
+.foot-fold > summary { font-size: 13.5px; font-weight: 600; min-height: 42px; }
+.foot .credits-short { margin-top: 10px; }
+@media (prefers-reduced-motion: reduce) { .fold > summary::after { transition: none; } }
 
 /* ================================================================
    첫 화면(body.home): 날씨 앱처럼 — 하늘빛 바탕 위에 흰 글씨와 반투명 카드.

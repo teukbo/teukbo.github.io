@@ -24,7 +24,7 @@
   const RAIN_MODEL_MM = 1.0, RAIN_START_MM = 0.3, SNOW_MIN_CM = 1.0;  // 날씨 요약: 48시간 합계가 이만큼이면 '비 예상'으로, 3시간 합계가 이만큼 되면 '시작'으로 본다  // 지도 위 이름표의 글자 크기(px) — style.css 의 .map-label · .map-station-name 과 같게
   const NEAR_COUNT = 16, NEAR_MIN = 12, NEAR_MAX = 42;  // 고른 지역 둘레를 얼마나 넓게 보여 줄지(이웃 지역 수 기준, 지도 단위 ≈ 1.7km)
   const MIN_PROOF_CASES = 30, MIN_PROOF_DAYS = 3;  // 과거 검증 값을 가능성 옆에 적으려면: 표본 30회 이상, 특보가 있었던 날 3일 이상
-  const state = { base: null, latest: null, live: null, zones: null, proof: null, longRain: null, region: null, query: "", paths: new Map(), centers: new Map(), labels: new Map(), svg: null, overlay: null, wideBox: null, liveTimer: null,
+  const state = { base: null, latest: null, live: null, zones: null, proof: null, longRain: null, openFolds: new Set(), region: null, query: "", paths: new Map(), centers: new Map(), labels: new Map(), svg: null, overlay: null, wideBox: null, liveTimer: null,
     rail: [], stations: [], stationsOf: new Map(),
     view: null,  // 지도를 직접 확대·이동했을 때의 보는 범위 [x, y, w, h]. null 이면 기본 범위(전국 또는 고른 지역 둘레)
     details: new Map() };  // `${지역 id}@${계산 시각}` → 시간별 예보(받는 중이면 "loading", 못 받았으면 null)  // stations: [{name, x, y, region}], stationsOf: 지역 id → 그 지역의 역 이름들
@@ -337,9 +337,19 @@
     const row = solid(own) ? own : solid(all) ? all : null;
     if (!row) return null;
     const scope = row === own ? `${(proof.by_type[hazard.type] || {}).name || ""} 특보` : "특보";
-    return `과거 검증: 가능성이 ${row.from === row.to ? `${row.from}%` : `${row.from}~${row.to}%`}였던 ${row.cases.toLocaleString("ko-KR")}번 가운데 ${row.hits.toLocaleString("ko-KR")}번(${share(row.hits, row.cases)})이 48시간 안에 실제 ${scope}로 이어졌습니다.`;
+    return `과거 ${row.from === row.to ? `${row.from}%` : `${row.from}~${row.to}%`}였을 때 ${share(row.hits, row.cases)}가 실제 ${scope}로 이어졌습니다 (${row.cases.toLocaleString("ko-KR")}번 중 ${row.hits.toLocaleString("ko-KR")}번).`;
   }
 
+  /** 접어 두는 칸. 화면은 몇 분마다 다시 그려지므로, 펼쳐 둔 칸은 기억해 두었다가 다시 펼친다. */
+  function fold(key, title, ...kids) {
+    const box = h("details", { class: "fold" }, h("summary", { text: title }), h("div", { class: "fold-body" }, kids));
+    box.open = state.openFolds.has(key);
+    box.addEventListener("toggle", () => { if (box.open) state.openFolds.add(key); else state.openFolds.delete(key); });
+    return box;
+  }
+  const statRow = (...stats) => h("div", { class: "stats" }, stats.map(([label, value]) => h("div", { class: "stat" }, h("p", { class: "stat-value", text: value }), h("p", { class: "stat-label", text: label }))));
+
+  /** 과거 검증: 눈에 보이는 것은 숫자 셋과 한 줄 설명뿐. 표·방법·한계는 접어 둔다(펼치면 전과 같은 내용이 모두 있다). */
   function renderProof() {
     const proof = state.proof, section = $("proof"), box = clear($("proof-body"));
     section.hidden = !proof || !proof.period || !proof.period.replays;
@@ -348,23 +358,19 @@
     const count = (n) => Number(n || 0).toLocaleString("ko-KR");
     const lead = (proof.capture || {})["24"] || {}, alerts = (proof.false_alarm || {}).caution_or_higher || {}, high = (proof.false_alarm || {}).high || {};
     const right = (a) => (a.alerts || 0) - (a.false || 0);
-    const tile = (label, value, sub) => h("div", { class: "tile" }, h("p", { class: "label", text: label }), h("p", { class: value === "–" ? "value pending" : "value", text: value }), h("p", { class: "sub", text: sub }));
     put(box,
-      h("p", { class: "proof-lede", text: `${day(proof.period.from)} ~ ${day(proof.period.to)}, 전국 ${count(proof.regions)}곳을 6시간마다 그때의 예보로 다시 계산해(${count(proof.period.replays)}회) 기상청의 실제 특보 기록과 맞춰 본 결과입니다. 실제 특보 ${count(proof.events)}건 · 특보가 시작된 날 ${count(proof.event_days)}일.` }),
-      h("div", { class: "tiles proof-tiles" },
-        tile("하루 전에 잡아낸 비율", share(lead.captured, lead.events), lead.events ? `실제 특보 ${count(lead.events)}건 중 ${count(lead.captured)}건이 24시간 전 ‘주의’ 이상` : "해당 사례 없음"),
-        tile("‘주의’ 이상이 맞은 비율", share(right(alerts), alerts.alerts), alerts.alerts ? `${count(alerts.alerts)}번 표시 중 ${count(right(alerts))}번이 48시간 안에 실제 특보` : "해당 사례 없음"),
-        tile("‘높음’이 맞은 비율", share(right(high), high.alerts), high.alerts ? `${count(high.alerts)}번 표시 중 ${count(right(high))}번이 실제 특보` : "해당 사례 없음")));
+      statRow(["하루 전에 잡아냄", share(lead.captured, lead.events)], ["‘주의’ 이상 맞음", share(right(alerts), alerts.alerts)], ["‘높음’ 맞음", share(right(high), high.alerts)]),
+      h("p", { class: "proof-lede", text: `${day(proof.period.from)} ~ ${day(proof.period.to)}의 실제 특보 ${count(proof.events)}건과 맞춰 본 결과입니다.` }));
     const rows = (proof.calibration || []).filter((row) => row.cases);
     if (rows.length) {
-      box.append(h("div", { class: "table-scroll" }, h("table", { class: "fit proof-table" },
+      box.append(fold("buckets", "가능성 구간별로 보기", h("div", { class: "table-scroll" }, h("table", { class: "fit proof-table" },
         h("thead", null, h("tr", null, h("th", { scope: "col", text: "표시한 가능성" }), h("th", { scope: "col", text: "횟수" }), h("th", { scope: "col" }, "실제 특보로 이어짐", h("small", null, "48시간 안")))),
-        h("tbody", null, rows.map((row) => h("tr", null, h("th", { scope: "row", text: row.bucket }), h("td", { text: count(row.cases) }), h("td", null, share(row.hits, row.cases), h("small", null, `${count(row.hits)}번 · 특보일 ${row.event_days}일`))))))));
+        h("tbody", null, rows.map((row) => h("tr", null, h("th", { scope: "row", text: row.bucket }), h("td", { text: count(row.cases) }), h("td", null, share(row.hits, row.cases), h("small", null, `${count(row.hits)}번 · 특보일 ${count(row.event_days)}일`)))))))));
     }
     const types = Object.values(proof.by_type || {}).filter((info) => info.events).sort((a, b) => b.events - a.events);
     if (types.length) {
-      box.append(h("div", { class: "table-scroll" }, h("table", { class: "fit proof-table" },
-        h("thead", null, h("tr", null, h("th", { scope: "col", text: "특보 종류" }), h("th", { scope: "col", text: "실제 특보" }), h("th", { scope: "col" }, "하루 전 포착", h("small", null, "‘주의’ 이상")), h("th", { scope: "col" }, "‘주의’ 이상이 맞음"))),
+      box.append(fold("types", "특보 종류별로 보기", h("div", { class: "table-scroll" }, h("table", { class: "fit proof-table" },
+        h("thead", null, h("tr", null, h("th", { scope: "col", text: "특보 종류" }), h("th", { scope: "col", text: "실제 특보" }), h("th", { scope: "col" }, "하루 전 포착", h("small", null, "‘주의’ 이상")), h("th", { scope: "col", text: "‘주의’ 이상이 맞음" }))),
         h("tbody", null, types.map((info) => {
           const c = (info.capture || {})["24"] || {}, a = (info.false_alarm || {}).caution_or_higher || {};
           // 표본이 적으면(30 미만) %를 적지 않고 횟수만 적는다 — 몇 건 안 되는 비율은 믿을 숫자가 아니다
@@ -374,42 +380,38 @@
           return h("tr", null, h("th", { scope: "row", text: info.name }),
             h("td", null, `${count(info.events)}건`, info.event_days != null ? h("small", null, `특보일 ${info.event_days}일`) : null),
             cell(c.captured, c.events, "해당 없음"), cell(right(a), a.alerts, "표시 없음"));
-        })))));
+        }))))));
     }
-    put(box, h("details", { class: "proof-notes" }, h("summary", { text: "어떻게 검증했나 · 한계" }),
-      h("ul", null, (proof.notes || []).map((text) => h("li", { text })),
-        (proof.types_without_events || []).length ? h("li", { text: `이 기간에 실제 특보가 없어 검증하지 못한 종류: ${proof.types_without_events.join(", ")}` }) : null,
-        h("li", { text: "가능성 옆의 ‘과거 검증’ 한 줄은 표본 30회 이상·특보가 있었던 날 3일 이상일 때만 적습니다." }))));
-    const longRain = longRainBlock(state.longRain);
+    const longRain = longRainFold(state.longRain);
     if (longRain) box.append(longRain);
+    box.append(fold("method", "어떻게 검증했나 · 한계", h("ul", { class: "fold-notes" },
+      h("li", { text: `전국 ${count(proof.regions)}곳을 6시간마다 그때의 예보로 다시 계산해(${count(proof.period.replays)}회) 기상청의 실제 특보 기록과 맞춰 봤습니다. 실제 특보 ${count(proof.events)}건${proof.event_days != null ? ` · 특보가 시작된 날 ${count(proof.event_days)}일` : ""}.` }),
+      lead.events ? h("li", { text: `하루 전에 잡아냄: 실제 특보 ${count(lead.events)}건 중 ${count(lead.captured)}건이 24시간 전에 ‘주의’ 이상이었습니다.` }) : null,
+      alerts.alerts ? h("li", { text: `‘주의’ 이상 맞음: ${count(alerts.alerts)}번 표시 중 ${count(right(alerts))}번이 48시간 안에 실제 특보로 이어졌습니다. ‘높음’은 ${count(high.alerts)}번 중 ${count(right(high))}번.` }) : null,
+      (proof.notes || []).map((text) => h("li", { text })),
+      (proof.types_without_events || []).length ? h("li", { text: `이 기간에 실제 특보가 없어 검증하지 못한 종류: ${proof.types_without_events.join(", ")}` }) : null,
+      h("li", { text: "가능성 옆의 ‘과거 …였을 때’ 한 줄은 표본 30회 이상·특보가 있었던 날 3일 이상일 때만 적습니다." }))));
   }
 
-  /** 호우를 더 긴 기간으로 본 확인(관측 일강수량 기준). 위의 표와 잣대가 달라 구역을 따로 두고, 무엇을 센 것인지 먼저 적는다. */
-  function longRainBlock(doc) {
+  /** 호우를 더 긴 기간으로 본 확인(관측 일강수량 기준). 위의 숫자와 잣대가 달라 접는 칸 하나에 따로 담고, 무엇을 센 것인지 먼저 적는다. */
+  function longRainFold(doc) {
     if (!doc || !doc.period || !doc.events) return null;
     const count = (n) => Number(n || 0).toLocaleString("ko-KR");
-    const month = (text) => { const [y, m] = String(text).split("-"); return `${y}년 ${Number(m)}월`; };
+    const [y1, m1] = String(doc.period.from).split("-").map(Number), [y2, m2] = String(doc.period.to).split("-").map(Number);
+    const months = (y2 - y1) * 12 + (m2 - m1), span = `${Math.floor(months / 12) ? `${Math.floor(months / 12)}년 ` : ""}${months % 12 ? `${months % 12}개월` : ""}`.trim();
     const mm = Number(doc.heavy_mm), before = doc.before_area_score || {}, high = doc.high || {}, zero = (doc.calibration || [])[0] || {}, unseen = doc.unseen || {};
-    const tile = (label, value, sub) => h("div", { class: "tile" }, h("p", { class: "label", text: label }), h("p", { class: "value", text: value }), h("p", { class: "sub", text: sub }));
-    const box = h("div", { class: "proof-long" },
-      h("h3", { text: "호우는 더 긴 기간으로도 확인했습니다" }),
-      h("p", { class: "proof-lede", text: `${month(doc.period.from)} ~ ${month(doc.period.to)}, 관측소가 있는 ${count(doc.regions)}개 지역을 매일 0시 기준으로 다시 계산해(${count(doc.period.replays)}회) 실제로 내린 비와 맞춰 본 결과입니다. 여기서 ‘큰비’는 그 지역 관측소의 하루 강수량 ${mm}mm 이상입니다 — 특보 발표 기록은 60일 전까지만 받을 수 있어, 오래된 기간은 관측값으로 대신했습니다(위 표와 잣대가 다릅니다). 큰비 ${count(doc.events)}건 · 큰비가 온 날 ${count(doc.event_days)}일.` }),
-      h("div", { class: "tiles proof-tiles" },
-        tile("큰비를 전날 잡아낸 비율", share(doc.day_before, doc.events), `큰비 ${count(doc.events)}건 중 ${count(doc.day_before)}건이 전날 0시에 ‘주의’ 이상${before.events ? ` · 주변 지역을 보기 전 계산식으로는 ${share(before.day_before, before.events)}` : ""}`),
-        tile("‘높음’ 뒤에 큰비가 온 비율", share(high.hits, high.alerts), `${count(high.alerts)}번 표시 중 ${count(high.hits)}번이 이틀 안에 큰비`),
-        tile("0% 뒤에 큰비가 온 비율", share(zero.hits, zero.cases), `${count(zero.cases)}번 중 ${count(zero.hits)}번`)));
-    const rows = (doc.calibration || []).filter((row) => row.cases);
-    if (rows.length) {
-      box.append(h("div", { class: "table-scroll" }, h("table", { class: "fit proof-table" },
+    const rows = (doc.calibration || []).filter((row) => row.cases), periods = (doc.by_period || []).filter((row) => row.events);
+    return fold("long-rain", `호우는 ${span}치로도 확인`,
+      h("p", { class: "proof-lede", text: `${y1}년 ${m1}월 ~ ${y2}년 ${m2}월, 관측소가 있는 ${count(doc.regions)}개 지역. 여기서 ‘큰비’는 관측소의 하루 강수량 ${mm}mm 이상입니다 — 특보 발표가 아니라 실제로 내린 비와 맞춘 것이라 위의 숫자와 잣대가 다릅니다.` }),
+      statRow(["큰비를 전날 잡아냄", share(doc.day_before, doc.events)], ["‘높음’ 뒤 큰비", share(high.hits, high.alerts)], ["0% 뒤 큰비", share(zero.hits, zero.cases)]),
+      rows.length ? h("div", { class: "table-scroll" }, h("table", { class: "fit proof-table" },
         h("thead", null, h("tr", null, h("th", { scope: "col", text: "표시한 호우주의보 가능성" }), h("th", { scope: "col", text: "횟수" }), h("th", { scope: "col" }, "큰비로 이어짐", h("small", null, "이틀 안")))),
-        h("tbody", null, rows.map((row) => h("tr", null, h("th", { scope: "row", text: row.bucket }), h("td", { text: count(row.cases) }), h("td", null, share(row.hits, row.cases), h("small", null, `${count(row.hits)}번`))))))));
-    }
-    const periods = (doc.by_period || []).filter((row) => row.events);
-    box.append(h("details", { class: "proof-notes" }, h("summary", { text: "어떻게 확인했나 · 한계 · 기간별" }),
-      h("ul", null, (doc.notes || []).map((text) => h("li", { text })),
+        h("tbody", null, rows.map((row) => h("tr", null, h("th", { scope: "row", text: row.bucket }), h("td", { text: count(row.cases) }), h("td", null, share(row.hits, row.cases), h("small", null, `${count(row.hits)}번`))))))) : null,
+      h("ul", { class: "fold-notes" },
+        h("li", { text: `매일 0시 기준으로 ${count(doc.period.replays)}회 다시 계산했습니다. 큰비 ${count(doc.events)}건(큰비가 온 날 ${count(doc.event_days)}일) 중 ${count(doc.day_before)}건이 전날 0시에 ‘주의’ 이상${before.events ? ` — 주변 지역을 보기 전 계산식으로는 ${share(before.day_before, before.events)}` : ""}. ‘높음’ ${count(high.alerts)}번 중 ${count(high.hits)}번이 이틀 안에 큰비.` }),
+        (doc.notes || []).map((text) => h("li", { text })),
         unseen.events ? h("li", { text: `기준을 맞출 때 보지 않은 기간(~ ${unseen.until})만: 큰비 ${count(unseen.events)}건 중 전날 ‘주의’ 이상 ${count(unseen.day_before)}건(${share(unseen.day_before, unseen.events)})${(unseen.before_area_score || {}).events ? `, 주변 지역을 보기 전 계산식으로는 ${share(unseen.before_area_score.day_before, unseen.before_area_score.events)}` : ""}.` }) : null,
-        periods.length ? h("li", { text: `기간별 전날 포착: ${periods.map((row) => `${row.name} ${share(row.day_before, row.events)}(${count(row.day_before)}/${count(row.events)})`).join(" · ")}.` }) : null)));
-    return box;
+        periods.length ? h("li", { text: `기간별 전날 포착: ${periods.map((row) => `${row.name} ${share(row.day_before, row.events)}(${count(row.day_before)}/${count(row.events)})`).join(" · ")}.` }) : null));
   }
 
   // ------------------------------------------------------------ 지도
