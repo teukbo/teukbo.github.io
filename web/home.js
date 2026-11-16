@@ -21,6 +21,7 @@
   const RELOAD_MS = 10 * 60 * 1000, STORE_KEY = "teukbo.region", MAX_MATCHES = 8, MAX_OTHERS = 4, MAX_NOTABLE = 4, MAX_STATIONS = 12;
   const MAX_OTHER_STATION_NAMES = 8, ZONE_FONT = 12, STATION_FONT = 11;
   const ZOOM_MIN_W = 5, LABEL_MAX_W = 120, ZOOM_STEP = 1.6;  // 가장 가까이 볼 때의 너비(지도 단위), 이름표·역을 적는 가장 넓은 범위, ＋/－ 한 번의 배율
+  const INTRO_REVEAL_MS = 80;  // 인트로가 옅어지기 시작하고 이만큼 뒤에 본문을 그린다
   const INTRO_MIN_MS = 4200, INTRO_FADE_MS = 500;  // 여는 화면: 게이지가 차고(2.3초) 이름이 다 나온 뒤(3.2초) 1초쯤 머물도록 연 때부터 최소 이만큼은 보이고, 이만큼에 걸쳐 걷힌다(style.css 의 .intro 와 같게)
   const RAIN_MODEL_MM = 1.0, RAIN_START_MM = 0.3, SNOW_MIN_CM = 1.0;  // 날씨 요약: 48시간 합계가 이만큼이면 '비 예상'으로, 3시간 합계가 이만큼 되면 '시작'으로 본다  // 지도 위 이름표의 글자 크기(px) — style.css 의 .map-label · .map-station-name 과 같게
   const NEAR_COUNT = 16, NEAR_MIN = 12, NEAR_MAX = 42;  // 고른 지역 둘레를 얼마나 넓게 보여 줄지(이웃 지역 수 기준, 지도 단위 ≈ 1.7km)
@@ -745,7 +746,23 @@
     intro.dataset.closing = "1";
     try { sessionStorage.setItem("teukbo.intro", "1"); } catch (_) { /* 무시 */ }
     const wait = now ? 0 : Math.max(0, INTRO_MIN_MS - performance.now());
-    setTimeout(() => { intro.classList.add("is-leaving"); setTimeout(() => intro.remove(), INTRO_FADE_MS + 100); }, wait);
+    setTimeout(() => {
+      intro.classList.add("is-leaving");
+      // 본문은 인트로가 옅어지기 시작한 바로 뒤에 처음 그린다(그 전에는 html.intro-on 으로 가려 둔다):
+      // 인트로에 완전히 가려진 채 그려지고 밀린 지도가 덜 그려진 채 남는 일을 막는다.
+      setTimeout(() => { document.documentElement.classList.remove("intro-on"); layoutOverlay(); }, INTRO_REVEAL_MS);
+      setTimeout(() => { intro.remove(); repaintMap(); }, INTRO_FADE_MS + 100);
+    }, wait);
+  }
+
+  /** 지도 칸을 다시 그리게 한다(자리·크기는 그대로). 인트로가 걷힌 뒤 한 번 — 덜 그려진 조각이 남았더라도 여기서 채워진다. */
+  function repaintMap() {
+    const card = document.querySelector(".home-map");
+    if (!card) return;
+    card.style.visibility = "hidden";
+    void card.offsetHeight;  // 지금 상태를 한 번 계산시킨 뒤 되돌려, 칸 전체를 새로 그릴 것으로 표시한다
+    card.style.visibility = "";
+    layoutOverlay();
   }
 
   $("q").addEventListener("input", (event) => { state.query = event.target.value; if (state.latest) renderMatches(); });
