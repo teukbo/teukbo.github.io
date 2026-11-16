@@ -11,8 +11,19 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="style.css?v=__BUILD__">
+  <!-- 여는 화면(인트로)은 앱을 열 때 한 번만: 같은 탭에서 새로고침하면 건너뛴다(첫 그림 전에 정해야 깜빡이지 않는다) -->
+  <script>try { if (sessionStorage.getItem("teukbo.intro") === "1") document.documentElement.classList.add("no-intro"); } catch (e) { /* 저장소를 못 쓰면 매번 보여 준다 */ }</script>
 </head>
 <body class="home">
+  <div class="intro" id="intro" aria-hidden="true">
+    <div class="intro-inner">
+      <img class="intro-icon" src="icons/icon.svg" alt="" width="96" height="96">
+      <p class="intro-title">기상특보 가능성</p>
+      <p class="intro-sub">앞으로 48시간, 우리 지역에 특보가 내려질 가능성</p>
+      <p class="intro-dots"><span></span><span></span><span></span></p>
+    </div>
+    <p class="intro-note">참고용 · 공식 특보·예비특보가 우선합니다</p>
+  </div>
   <div class="notice" role="note">
     <svg class="notice-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 18.5 17h-17L10 2.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 8v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="14.6" r="1" fill="currentColor"/></svg>
     <span>참고용입니다. 공식 특보·예비특보가 우선합니다.</span>

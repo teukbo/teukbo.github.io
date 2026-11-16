@@ -771,6 +771,28 @@ class RailPageTest(unittest.TestCase):
             self.assertIn(name, visible, name)
         self.assertIn("CC BY 4.0", foot)
 
+    def test_first_screen_opens_with_an_intro_that_cannot_trap_the_reader(self):
+        """여는 화면(인트로): 첫 그림부터 보이고, 첫 화면이 그려지면(자료를 못 받아도) 걷힌다. 스크립트가 돌지 않아도 CSS 가 스스로 걷고, 같은 탭에서 다시 열면 건너뛴다."""
+        html = (self.WEB / "index.html").read_text(encoding="utf-8")
+        script = (self.WEB / "home.js").read_text(encoding="utf-8")
+        style = (self.WEB / "style.css").read_text(encoding="utf-8")
+        body = html[html.index("<body"):]
+        self.assertLess(body.index('id="intro"'), body.index('class="notice"'))  # 본문보다 먼저 — 스크립트 없이도 처음부터 보인다
+        self.assertIn('<div class="intro" id="intro" aria-hidden="true">', body)  # 장식이라 읽어 주지 않는다(누를 것도 두지 않는다)
+        intro = body[body.index('id="intro"'):body.index('class="notice"')]
+        self.assertNotIn("<button", intro)
+        self.assertNotIn("<a ", intro)
+        self.assertIn("참고용", intro)
+        head = html[:html.index("</head>")]
+        self.assertIn('sessionStorage.getItem("teukbo.intro")', head)  # 첫 그림 전에 건너뛸지 정한다(깜빡임 방지)
+        self.assertIn("html.no-intro .intro { display: none; }", style)
+        self.assertIn("animation: intro-leave 0.4s ease 4s forwards", style)  # 스크립트가 걷지 못해도 4초 뒤 스스로
+        self.assertIn("@keyframes intro-leave { to { opacity: 0; visibility: hidden; } }", style)
+        load = script[script.index("async function load()"):script.index("function closeIntro(")]
+        self.assertEqual(load.count("closeIntro()"), 2)  # 그려졌을 때와 못 받았을 때 모두
+        self.assertIn('sessionStorage.setItem("teukbo.intro", "1")', script)
+        self.assertIn("prefers-reduced-motion: reduce) { .intro-inner { animation: none; }", style)
+
     def test_installed_app_opens_in_the_first_screen_colours(self):
         """홈 화면에 추가해 앱처럼 열 때(브라우저 메뉴로 설치): 주소창 없이 열리고, 켜질 때의 바탕이 첫 화면의 밤하늘 색이다. 첫 화면에 설치 안내 칸은 두지 않는다."""
         import json
