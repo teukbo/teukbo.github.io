@@ -804,6 +804,13 @@ class RailPageTest(unittest.TestCase):
         load = script[script.index("async function load()"):script.index("function closeIntro(")]
         self.assertEqual(load.count("closeIntro()"), 2)  # 그려졌을 때와 못 받았을 때 모두
         self.assertIn('sessionStorage.setItem("teukbo.intro", "1")', script)
+        # 인트로가 떠 있는 동안에는 본문을 그리지 않는다: 가려진 채 그려지고 밀린 지도가 일부 휴대폰에서 덜 그려진 채 남았다(2026-11-17).
+        self.assertIn('document.documentElement.classList.add(seen ? "no-intro" : "intro-on")', head)
+        self.assertIn("html.intro-on main, html.intro-on .foot { visibility: hidden; animation: intro-reveal 0s linear 6s forwards; }", style)  # 스크립트가 못 빼도 6초 뒤에는 보인다
+        self.assertIn('document.documentElement.classList.remove("intro-on")', script)
+        self.assertIn("intro.remove(); repaintMap();", script)  # 걷힌 뒤 지도 칸을 한 번 다시 그리게 한다
+        cards = next(line for line in style.splitlines() if line.startswith("body.home .glass, body.home .home-map, body.home .proof {"))
+        self.assertNotIn("backdrop-filter", cards)  # 칸마다 따로 합성되는 배경 흐림은 쓰지 않는다
         self.assertIn("prefers-reduced-motion: reduce) { .intro-arc, .intro-needle, .intro-title { animation: none; } .intro-arc { stroke-dashoffset: 0; } }", style)
 
     def test_first_screen_help_explains_grades_and_warning_stages_from_data(self):

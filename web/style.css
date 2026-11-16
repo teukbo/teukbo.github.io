@@ -986,7 +986,9 @@ body.home .pill.g-active { border-color: #d43c3c; background: #d43c3c; color: #f
 body.home .pill.g-pre { border: 1px dashed #fff; background: transparent; color: #fff; }
 
 /* 반투명 카드 */
-body.home .glass, body.home .home-map, body.home .proof { margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+/* 칸에는 배경 흐림(backdrop-filter)을 쓰지 않는다: 뒤가 매끈한 그러데이션이라 흐려도 달라 보이지 않는데, 칸마다 따로 합성되어
+   일부 휴대폰에서 지도 칸이 덜 그려진 채 남는 일이 있었다. */
+body.home .glass, body.home .home-map, body.home .proof { margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface); }
 body.home .glass-title { margin: 0; font-size: 15px; font-weight: 700; }
 body.home .glass-title small { color: var(--ink-3); font-size: 12.5px; font-weight: 400; }
 
@@ -1043,6 +1045,10 @@ body.home .linklike { color: #fff; }
 .intro { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #111b38 linear-gradient(180deg, #101c3c 0%, #1a2a56 40%, #20315f 68%, #111b38 100%); color: #fff; animation: intro-leave 0.5s ease 6s forwards; }
 .intro.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.5s ease, visibility 0s linear 0.5s; }
 html.no-intro .intro { display: none; }
+/* 인트로가 떠 있는 동안에는 본문을 그리지 않는다(자리는 잡아 둔다). 걷히기 시작할 때 intro-on 이 빠지면서 한 번에 그려진다.
+   스크립트가 빼 주지 못해도 인트로가 스스로 걷히는 때(6초)에는 보이게 한다. */
+html.intro-on main, html.intro-on .foot { visibility: hidden; animation: intro-reveal 0s linear 6s forwards; }
+@keyframes intro-reveal { to { visibility: visible; } }
 .intro-inner { padding: 24px; text-align: center; }
 .intro-icon { display: block; width: 112px; height: 112px; margin: 0 auto; filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.4)); }
 .intro-arc { stroke-dasharray: 1; stroke-dashoffset: 1; animation: intro-fill 0.65s ease-out forwards; }
