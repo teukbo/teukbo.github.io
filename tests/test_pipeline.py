@@ -806,6 +806,25 @@ class RailPageTest(unittest.TestCase):
         self.assertIn('sessionStorage.setItem("teukbo.intro", "1")', script)
         self.assertIn("prefers-reduced-motion: reduce) { .intro-arc, .intro-needle, .intro-title { animation: none; } .intro-arc { stroke-dashoffset: 0; } }", style)
 
+    def test_first_screen_help_explains_grades_and_warning_stages_from_data(self):
+        """? 단추: 이 화면의 등급과 기상청 특보 단계를 알려 준다. 등급의 경계와 특보별 발표 기준은 받아 온 자료에서 읽고, 화면 코드에 기준값을 적지 않는다."""
+        html = (self.WEB / "index.html").read_text(encoding="utf-8")
+        script = (self.WEB / "home.js").read_text(encoding="utf-8")
+        self.assertIn('<button type="button" class="help-button" id="help-open" aria-label="등급과 특보 단계 설명" aria-haspopup="dialog">?</button>', html)
+        self.assertIn('<dialog class="help" id="help" aria-label="등급과 특보 단계">', html)
+        self.assertIn('id="help-close" aria-label="닫기"', html)
+        help_code = script[script.index("function renderHelp()"):script.index("function closeHelp()")]
+        for needle in ("latest.grades", "official_text", "latest.levels", "proof.calibration", "showModal", "예비특보"):
+            self.assertIn(needle, help_code, needle)
+        for number in ("60mm", "110mm", "14m/s", "33℃", "5cm"):  # 발표 기준의 숫자는 설정(thresholds.json → latest.json)에만 있다
+            self.assertNotIn(number, script, number)
+        self.assertIn("if (event.target === $(\"help\")) closeHelp();", script)  # 바깥을 누르면 닫힌다
+        # 그 발표 기준 글이 실제로 자료에 실린다
+        from teukbo.config import load_config
+        from teukbo import storage
+        self.assertIn("official_text", Path(storage.__file__).read_text(encoding="utf-8"))
+        self.assertTrue(all(h.official_text for h in load_config().thresholds.hazards))
+
     def test_installed_app_opens_in_the_first_screen_colours(self):
         """홈 화면에 추가해 앱처럼 열 때(브라우저 메뉴로 설치): 주소창 없이 열리고, 켜질 때의 바탕이 첫 화면의 밤하늘 색이다. 첫 화면에 설치 안내 칸은 두지 않는다."""
         import json
