@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-16T17:25+09:00",
+  "updated_at": "2026-11-16T20:52+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-16T17:25+09:00",
-    "runs": 45,
+    "to": "2026-11-16T20:52+09:00",
+    "runs": 46,
     "window_days": 365
   },
   "lead_hours": [
@@ -28,8 +28,8 @@
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 22,
-      "false": 22,
+      "alerts": 25,
+      "false": 25,
       "rate": 1.0
     },
     "high": {
@@ -86,6 +86,34 @@
         "caution_or_higher": {
           "alerts": 13,
           "false": 13,
+          "rate": 1.0
+        },
+        "high": {
+          "alerts": 0,
+          "false": 0,
+          "rate": null
+        }
+      }
+    },
+    "cold_wave": {
+      "name": "한파",
+      "events": 0,
+      "capture": {
+        "12": {
+          "events": 0,
+          "captured": 0,
+          "rate": null
+        },
+        "24": {
+          "events": 0,
+          "captured": 0,
+          "rate": null
+        }
+      },
+      "false_alarm": {
+        "caution_or_higher": {
+          "alerts": 3,
+          "false": 3,
           "rate": 1.0
         },
         "high": {
