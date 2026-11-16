@@ -782,7 +782,18 @@ class RailPageTest(unittest.TestCase):
         intro = body[body.index('id="intro"'):body.index('class="notice"')]
         self.assertNotIn("<button", intro)
         self.assertNotIn("<a ", intro)
-        self.assertIn("참고용", intro)
+        # 글은 이름 하나뿐: 로고의 게이지 눈금이 차오르고 바늘이 올라간 뒤 이름이 나온다
+        self.assertEqual(intro.count("<p "), 1)  # 글 문단은 하나(<path> 는 그림)
+        self.assertIn('<p class="intro-title">기상특보 가능성</p>', intro)
+        self.assertEqual(intro.count('class="intro-arc '), 3)
+        self.assertIn('class="intro-needle"', intro)
+        for rule in ("@keyframes intro-fill { to { stroke-dashoffset: 0; } }", "@keyframes intro-needle { from { transform: rotate(-128.8deg); } to { transform: rotate(0deg); } }",
+                     "transform-origin: 256px 318px"):
+            self.assertIn(rule, style, rule)
+        logo = (self.WEB / "icons" / "icon.svg").read_text(encoding="utf-8")
+        for shape in ('d="M116 318a140 140 0 0 1 41-99"', 'd="M190 194a140 140 0 0 1 132 0"', 'd="M355 219a140 140 0 0 1 41 99"', 'd="M256 318 330 226"'):
+            self.assertIn(shape, intro, shape)  # 로고와 같은 그림
+            self.assertIn(shape, logo, shape)
         head = html[:html.index("</head>")]
         self.assertIn('sessionStorage.getItem("teukbo.intro")', head)  # 첫 그림 전에 건너뛸지 정한다(깜빡임 방지)
         self.assertIn("html.no-intro .intro { display: none; }", style)
@@ -791,7 +802,7 @@ class RailPageTest(unittest.TestCase):
         load = script[script.index("async function load()"):script.index("function closeIntro(")]
         self.assertEqual(load.count("closeIntro()"), 2)  # 그려졌을 때와 못 받았을 때 모두
         self.assertIn('sessionStorage.setItem("teukbo.intro", "1")', script)
-        self.assertIn("prefers-reduced-motion: reduce) { .intro-inner { animation: none; }", style)
+        self.assertIn("prefers-reduced-motion: reduce) { .intro-arc, .intro-needle, .intro-title { animation: none; } .intro-arc { stroke-dashoffset: 0; } }", style)
 
     def test_installed_app_opens_in_the_first_screen_colours(self):
         """홈 화면에 추가해 앱처럼 열 때(브라우저 메뉴로 설치): 주소창 없이 열리고, 켜질 때의 바탕이 첫 화면의 밤하늘 색이다. 첫 화면에 설치 안내 칸은 두지 않는다."""
