@@ -415,6 +415,58 @@
         periods.length ? h("li", { text: `기간별 전날 포착: ${periods.map((row) => `${row.name} ${share(row.day_before, row.events)}(${count(row.day_before)}/${count(row.events)})`).join(" · ")}.` }) : null));
   }
 
+  // ------------------------------------------------------------ 도움말(? 단추)
+
+  /** 이 화면의 등급과 기상청 특보 단계. 숫자와 발표 기준은 받아 온 자료(등급 기준 grades, 특보별 발표 기준 hazards[].official_text)에서 가져온다 —
+   *  기준값을 여기에 따로 적지 않는다. 등급 옆의 '과거 …'는 과거 검증에서 그 구간이 실제 특보로 이어진 비율이다. */
+  function renderHelp() {
+    const box = clear($("help-body")), latest = state.latest || {}, proof = state.proof || {};
+    const caution = Math.round((latest.grades || {}).caution_min || 30), high = Math.round((latest.grades || {}).high_min || 60);
+    const past = (from) => { const row = (proof.calibration || []).find((r) => r.from === from && r.cases); return row ? `과거 ${share(row.hits, row.cases)}가 실제 특보로 이어짐` : null; };
+    const grade = (id, range, text, note) => h("li", null, h("div", { class: "help-key" }, gradePill(id), range ? h("span", { class: "help-range", text: range }) : null),
+      h("p", { class: "help-text" }, text, note ? h("small", null, note) : null));
+    put(box,
+      h("h3", { text: "이 화면의 등급" }),
+      h("ul", { class: "help-list" },
+        grade("low", `0~${caution - 1}%`, "특보 가능성이 낮습니다."),
+        grade("caution", `${caution}~${high - 1}%`, "예보를 다시 확인해 둘 때입니다.", past(caution)),
+        grade("high", `${high}% 이상`, "특보가 날 가능성이 큽니다.", past(high)),
+        grade("active", "", "기상청 특보가 실제로 내려져 있습니다.")),
+      h("p", { class: "help-note", text: "기상청이 예비특보를 내면 숫자와 관계없이 ‘높음’ 이상으로, 특보를 내면 ‘발효 중’으로 바꿔 보여 줍니다. 공식 발표가 늘 먼저입니다." }));
+
+    const levels = Object.entries(latest.levels || {}).sort((a, b) => a[1].rank - b[1].rank);
+    const meaning = { advisory: "재해가 일어날 우려가 있을 때", warning: "중대한 재해가 일어날 우려가 있을 때" };
+    const used = new Set((latest.hazards || []).map((item) => item.level));
+    const extra = levels.filter(([id]) => !meaning[id] && used.has(id)).map(([id, info]) => {
+      const types = [...new Set((latest.hazards || []).filter((item) => item.level === id).map((item) => (latest.types || []).find((t) => t.id === item.type)).filter(Boolean).map((t) => t.name))];
+      return `${types.join("·")}에는 그 위에 ${info.name}가 있습니다.`;
+    });
+    put(box,
+      h("h3", { text: "기상청 특보 단계" }),
+      h("ol", { class: "help-steps" },
+        h("li", null, h("b", { text: "예비특보" }), h("span", { text: "특보를 낼 것으로 예상될 때 미리 알림" })),
+        levels.filter(([id]) => meaning[id]).map(([id, info]) => h("li", null, h("b", { text: info.name }), h("span", { text: meaning[id] })))),
+      extra.length ? h("p", { class: "help-note", text: extra.join(" ") }) : null);
+
+    const groups = (latest.types || []).map((type) => ({ type, items: (latest.hazards || []).filter((item) => item.type === type.id && item.official_text).sort((a, b) => ((latest.levels || {})[a.level] || {}).rank - ((latest.levels || {})[b.level] || {}).rank) })).filter((group) => group.items.length);
+    if (groups.length) {
+      const source = latest.thresholds || {};
+      box.append(fold("help-criteria", "특보 종류별 발표 기준",
+        h("dl", { class: "help-criteria" }, groups.map((group) => [h("dt", { text: group.type.name }),
+          group.items.map((item) => h("dd", null, h("b", { text: ((latest.levels || {})[item.level] || {}).name || item.name }), ` ${item.official_text}`))])),
+        h("p", { class: "help-note", text: `기상법 시행령의 특보 기준${source.version ? `(${source.version} 시행)` : ""}을 옮긴 것입니다${source.checked_at ? ` · ${source.checked_at} 확인` : ""}.` })));
+    }
+  }
+  function openHelp() {
+    const dialog = $("help");
+    renderHelp();
+    if (typeof dialog.showModal === "function") { if (!dialog.open) dialog.showModal(); } else dialog.setAttribute("open", "");
+  }
+  function closeHelp() {
+    const dialog = $("help");
+    if (typeof dialog.close === "function") dialog.close(); else dialog.removeAttribute("open");
+  }
+
   // ------------------------------------------------------------ 지도
 
   const pathOf = (rings) => rings.map((ring) => { let d = ""; for (let i = 0; i < ring.length; i += 2) { const [x, y] = P(ring[i], ring[i + 1]); d += `${i ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`; } return `${d}Z`; }).join("");
@@ -703,6 +755,9 @@
     if (found.length) { event.preventDefault(); pick(found[0].id); event.target.blur(); }
   });
   $("back").addEventListener("click", () => pick(null));
+  $("help-open").addEventListener("click", openHelp);
+  $("help-close").addEventListener("click", closeHelp);
+  $("help").addEventListener("click", (event) => { if (event.target === $("help")) closeHelp(); });  // 바깥의 어두운 곳을 누르면 닫는다
   if ($("intro")) $("intro").addEventListener("click", () => closeIntro(true));
   // 화면 크기가 바뀌면(휴대폰을 돌리거나 창을 줄이면) 이름표·역의 자리를 다시 잡는다
   if (window.ResizeObserver) new ResizeObserver(() => layoutOverlay()).observe($("map")); else window.addEventListener("resize", layoutOverlay);

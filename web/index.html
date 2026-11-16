@@ -40,7 +40,10 @@
   <header class="masthead">
     <div class="wrap">
       <div class="title-row">
-        <h1>기상특보 가능성</h1>
+        <div class="title-main">
+          <h1>기상특보 가능성</h1>
+          <button type="button" class="help-button" id="help-open" aria-label="등급과 특보 단계 설명" aria-haspopup="dialog">?</button>
+        </div>
         <p class="updated" id="updated" aria-live="polite">불러오는 중…</p>
       </div>
     </div>
@@ -70,6 +73,17 @@
       <div id="proof-body"></div>
     </section>
   </main>
+
+  <!-- ? 단추로 여는 도움말: 이 화면의 등급과 기상청 특보 단계. 내용은 화면 스크립트가 자료(등급 기준·발표 기준)로 채운다 -->
+  <dialog class="help" id="help" aria-label="등급과 특보 단계">
+    <div class="help-sheet">
+      <div class="help-head">
+        <h2 class="help-title">등급과 특보 단계</h2>
+        <button type="button" class="help-close" id="help-close" aria-label="닫기">×</button>
+      </div>
+      <div id="help-body"></div>
+    </div>
+  </dialog>
 
   <footer class="foot">
     <div class="wrap">
