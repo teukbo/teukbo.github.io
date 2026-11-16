@@ -21,7 +21,7 @@
   const RELOAD_MS = 10 * 60 * 1000, STORE_KEY = "teukbo.region", MAX_MATCHES = 8, MAX_OTHERS = 4, MAX_NOTABLE = 4, MAX_STATIONS = 12;
   const MAX_OTHER_STATION_NAMES = 8, ZONE_FONT = 12, STATION_FONT = 11;
   const ZOOM_MIN_W = 5, LABEL_MAX_W = 120, ZOOM_STEP = 1.6;  // 가장 가까이 볼 때의 너비(지도 단위), 이름표·역을 적는 가장 넓은 범위, ＋/－ 한 번의 배율
-  const INTRO_MIN_MS = 2100, INTRO_FADE_MS = 400;  // 여는 화면: 게이지가 차고(1.15초) 이름이 나온 뒤(1.6초) 잠깐 머물도록 연 때부터 최소 이만큼은 보이고, 이만큼에 걸쳐 걷힌다(style.css 의 .intro 와 같게)
+  const INTRO_MIN_MS = 4200, INTRO_FADE_MS = 500;  // 여는 화면: 게이지가 차고(2.3초) 이름이 다 나온 뒤(3.2초) 1초쯤 머물도록 연 때부터 최소 이만큼은 보이고, 이만큼에 걸쳐 걷힌다(style.css 의 .intro 와 같게)
   const RAIN_MODEL_MM = 1.0, RAIN_START_MM = 0.3, SNOW_MIN_CM = 1.0;  // 날씨 요약: 48시간 합계가 이만큼이면 '비 예상'으로, 3시간 합계가 이만큼 되면 '시작'으로 본다  // 지도 위 이름표의 글자 크기(px) — style.css 의 .map-label · .map-station-name 과 같게
   const NEAR_COUNT = 16, NEAR_MIN = 12, NEAR_MAX = 42;  // 고른 지역 둘레를 얼마나 넓게 보여 줄지(이웃 지역 수 기준, 지도 단위 ≈ 1.7km)
   const MIN_PROOF_CASES = 30, MIN_PROOF_DAYS = 3;  // 과거 검증 값을 가능성 옆에 적으려면: 표본 30회 이상, 특보가 있었던 날 3일 이상

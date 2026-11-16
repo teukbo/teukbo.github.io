@@ -797,7 +797,9 @@ class RailPageTest(unittest.TestCase):
         head = html[:html.index("</head>")]
         self.assertIn('sessionStorage.getItem("teukbo.intro")', head)  # 첫 그림 전에 건너뛸지 정한다(깜빡임 방지)
         self.assertIn("html.no-intro .intro { display: none; }", style)
-        self.assertIn("animation: intro-leave 0.4s ease 4s forwards", style)  # 스크립트가 걷지 못해도 4초 뒤 스스로
+        self.assertIn("animation: intro-leave 0.5s ease 6s forwards", style)  # 스크립트가 걷지 못해도 6초 뒤 스스로
+        self.assertIn("const INTRO_MIN_MS = 4200, INTRO_FADE_MS = 500;", script)  # 그 전에 스크립트가 먼저 걷는다(이름이 다 나온 뒤 잠깐 머물고)
+        self.assertIn("animation: intro-needle 1.9s", style)  # 바늘이 천천히 올라간다
         self.assertIn("@keyframes intro-leave { to { opacity: 0; visibility: hidden; } }", style)
         load = script[script.index("async function load()"):script.index("function closeIntro(")]
         self.assertEqual(load.count("closeIntro()"), 2)  # 그려졌을 때와 못 받았을 때 모두

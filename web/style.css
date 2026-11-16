@@ -1039,18 +1039,18 @@ body.home .linklike { color: #fff; }
 
 /* 여는 화면(인트로): 로고의 게이지 눈금이 왼쪽부터 차오르며 바늘이 올라가고, 이어서 이름이 나타난다. 글은 이름 하나뿐.
    바탕은 첫 화면의 밤하늘 — 설치한 앱이 켜질 때의 바탕색(manifest 의 background_color)과 이어진다.
-   스크립트가 걷지 못해도 4초 뒤에는 스스로 걷힌다(intro-leave). 시간은 home.js 의 INTRO_MIN_MS 와 맞춘다(이름이 나온 뒤 잠깐 머문다). */
-.intro { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #111b38 linear-gradient(180deg, #101c3c 0%, #1a2a56 40%, #20315f 68%, #111b38 100%); color: #fff; animation: intro-leave 0.4s ease 4s forwards; }
-.intro.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.4s ease, visibility 0s linear 0.4s; }
+   스크립트가 걷지 못해도 6초 뒤에는 스스로 걷힌다(intro-leave). 시간은 home.js 의 INTRO_MIN_MS 와 맞춘다(이름이 나온 뒤 잠깐 머문다). */
+.intro { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #111b38 linear-gradient(180deg, #101c3c 0%, #1a2a56 40%, #20315f 68%, #111b38 100%); color: #fff; animation: intro-leave 0.5s ease 6s forwards; }
+.intro.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.5s ease, visibility 0s linear 0.5s; }
 html.no-intro .intro { display: none; }
 .intro-inner { padding: 24px; text-align: center; }
 .intro-icon { display: block; width: 112px; height: 112px; margin: 0 auto; filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.4)); }
-.intro-arc { stroke-dasharray: 1; stroke-dashoffset: 1; animation: intro-fill 0.34s ease-out forwards; }
-.intro-arc-1 { animation-delay: 0.2s; }
-.intro-arc-2 { animation-delay: 0.5s; }
-.intro-arc-3 { animation-delay: 0.8s; }
-.intro-needle { transform-box: view-box; transform-origin: 256px 318px; animation: intro-needle 0.95s cubic-bezier(0.45, 0, 0.3, 1.25) 0.2s both; }
-.intro-title { margin: 24px 0 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; animation: intro-rise 0.45s ease-out 1.15s both; }
+.intro-arc { stroke-dasharray: 1; stroke-dashoffset: 1; animation: intro-fill 0.65s ease-out forwards; }
+.intro-arc-1 { animation-delay: 0.4s; }
+.intro-arc-2 { animation-delay: 1s; }
+.intro-arc-3 { animation-delay: 1.6s; }
+.intro-needle { transform-box: view-box; transform-origin: 256px 318px; animation: intro-needle 1.9s cubic-bezier(0.3, 0.2, 0.3, 1.1) 0.4s both; }
+.intro-title { margin: 24px 0 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; animation: intro-rise 0.8s ease-out 2.4s both; }
 @keyframes intro-fill { to { stroke-dashoffset: 0; } }
 @keyframes intro-needle { from { transform: rotate(-128.8deg); } to { transform: rotate(0deg); } }
 @keyframes intro-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
