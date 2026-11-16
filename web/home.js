@@ -21,6 +21,7 @@
   const RELOAD_MS = 10 * 60 * 1000, STORE_KEY = "teukbo.region", MAX_MATCHES = 8, MAX_OTHERS = 4, MAX_NOTABLE = 4, MAX_STATIONS = 12;
   const MAX_OTHER_STATION_NAMES = 8, ZONE_FONT = 12, STATION_FONT = 11;
   const ZOOM_MIN_W = 5, LABEL_MAX_W = 120, ZOOM_STEP = 1.6;  // 가장 가까이 볼 때의 너비(지도 단위), 이름표·역을 적는 가장 넓은 범위, ＋/－ 한 번의 배율
+  const INTRO_MIN_MS = 1100, INTRO_FADE_MS = 400;  // 여는 화면: 페이지를 연 때부터 최소 이만큼은 보이고, 이만큼에 걸쳐 걷힌다(style.css 의 .intro.is-leaving 과 같게)
   const RAIN_MODEL_MM = 1.0, RAIN_START_MM = 0.3, SNOW_MIN_CM = 1.0;  // 날씨 요약: 48시간 합계가 이만큼이면 '비 예상'으로, 3시간 합계가 이만큼 되면 '시작'으로 본다  // 지도 위 이름표의 글자 크기(px) — style.css 의 .map-label · .map-station-name 과 같게
   const NEAR_COUNT = 16, NEAR_MIN = 12, NEAR_MAX = 42;  // 고른 지역 둘레를 얼마나 넓게 보여 줄지(이웃 지역 수 기준, 지도 단위 ≈ 1.7km)
   const MIN_PROOF_CASES = 30, MIN_PROOF_DAYS = 3;  // 과거 검증 값을 가능성 옆에 적으려면: 표본 30회 이상, 특보가 있었던 날 3일 이상
@@ -671,6 +672,7 @@
         drawMap();
       }
       render();
+      closeIntro();
       refreshLive();
       const poll = Math.max(30, Number((latest.live || {}).poll_seconds) || 120) * 1000;
       if (!state.liveTimer && latest.live && latest.live.url) state.liveTimer = setInterval(refreshLive, poll);
@@ -679,7 +681,19 @@
         $("updated").textContent = "";
         clear($("result")).append(h("div", { class: "panel" }, h("p", { class: "empty", text: "자료를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요." })));
       }
+      closeIntro();  // 못 받았을 때도 안내 글이 보이게 걷는다
     }
+  }
+
+  /** 여는 화면(인트로)을 걷는다: 첫 화면이 그려진 뒤에, 그래도 너무 번쩍 지나가지 않게 최소 시간은 채우고. 누르면 바로 걷힌다.
+   *  스크립트가 돌지 않아도 몇 초 뒤에는 CSS 가 스스로 걷는다(style.css 의 intro-leave) — 여는 화면에 갇히는 일이 없게. */
+  function closeIntro(now) {
+    const intro = $("intro");
+    if (!intro || intro.dataset.closing) return;
+    intro.dataset.closing = "1";
+    try { sessionStorage.setItem("teukbo.intro", "1"); } catch (_) { /* 무시 */ }
+    const wait = now ? 0 : Math.max(0, INTRO_MIN_MS - performance.now());
+    setTimeout(() => { intro.classList.add("is-leaving"); setTimeout(() => intro.remove(), INTRO_FADE_MS + 100); }, wait);
   }
 
   $("q").addEventListener("input", (event) => { state.query = event.target.value; if (state.latest) renderMatches(); });
@@ -689,6 +703,7 @@
     if (found.length) { event.preventDefault(); pick(found[0].id); event.target.blur(); }
   });
   $("back").addEventListener("click", () => pick(null));
+  if ($("intro")) $("intro").addEventListener("click", () => closeIntro(true));
   // 화면 크기가 바뀌면(휴대폰을 돌리거나 창을 줄이면) 이름표·역의 자리를 다시 잡는다
   if (window.ResizeObserver) new ResizeObserver(() => layoutOverlay()).observe($("map")); else window.addEventListener("resize", layoutOverlay);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && state.base) { load(); } });
