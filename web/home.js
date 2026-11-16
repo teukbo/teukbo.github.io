@@ -695,4 +695,57 @@
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => { /* 오프라인 지원 없이 계속 */ }));
   }
+
+  // ------------------------------------------------------------ 앱으로 설치
+  // 이 사이트는 설치형 웹앱(PWA)이다: 홈 화면에 아이콘이 생기고 주소창 없이 열린다(스토어·설치 파일 없이).
+  // 브라우저가 '설치할 수 있다'고 알려 주면(beforeinstallprompt) 버튼 하나로 설치하고, 그 신호가 없는 곳(아이폰, 카카오톡 같은 앱 속 화면)은 방법을 적는다.
+  // 이미 앱으로 열었거나 닫기를 누른 사람에게는 보이지 않는다.
+  const INSTALL_KEY = "teukbo.install.dismissed";
+  const INSTALL_WAIT_MS = 4000;  // 안드로이드에서 설치 신호를 이만큼 기다렸다가, 오지 않으면 메뉴로 설치하는 법을 보여 준다
+  let installEvent = null, installWaited = false;
+  const isStandalone = () => (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+  function installKind() {
+    const ua = navigator.userAgent || "";
+    if (/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\//i.test(ua)) return "inapp";
+    if (installEvent) return "prompt";
+    if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
+    if (/Android/i.test(ua) && installWaited) return "menu";  // 설치 신호를 주지 않는 안드로이드 브라우저: 메뉴로 설치하는 법을 적는다
+    return null;  // PC 브라우저 등: 주소창의 설치 단추를 쓰면 되므로 따로 권하지 않는다
+  }
+  function renderInstall() {
+    const box = clear($("install"));
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(INSTALL_KEY) === "1"; } catch (_) { /* 무시 */ }
+    const kind = isStandalone() || dismissed ? null : installKind();
+    box.hidden = !kind;
+    if (!kind) return;
+    const close = h("button", { type: "button", class: "install-close", "aria-label": "설치 안내 닫기", text: "×" });
+    close.addEventListener("click", () => { try { localStorage.setItem(INSTALL_KEY, "1"); } catch (_) { /* 무시 */ } renderInstall(); });
+    const head = h("div", { class: "install-head" }, h("img", { src: "icons/icon-192.png", alt: "", width: "44", height: "44" }),
+      h("div", null, h("p", { class: "install-title", text: "앱으로 설치" }), h("p", { class: "install-sub", text: "홈 화면에 아이콘이 생기고, 주소창 없이 바로 열립니다. 무료 · 로그인 없음" })), close);
+    if (kind === "prompt") {
+      const button = h("button", { type: "button", class: "install-button", text: "설치하기" });
+      button.addEventListener("click", async () => {
+        if (!installEvent) return;
+        const event = installEvent;
+        installEvent = null;  // 한 번만 쓸 수 있다
+        try { event.prompt(); await event.userChoice; } catch (_) { /* 브라우저가 창을 띄우지 못하면 그대로 둔다 */ }
+        renderInstall();
+      });
+      put(box, head, button);
+    } else if (kind === "menu") {
+      put(box, head, h("ol", { class: "install-steps" }, h("li", { text: "브라우저 메뉴(삼성 인터넷은 아래의 ≡, 크롬은 위의 ⋮)를 누릅니다." }), h("li", { text: "‘홈 화면에 추가’ 또는 ‘앱 설치’를 누릅니다(삼성 인터넷: 현재 페이지 추가 → 홈 화면)." })));
+    } else if (kind === "ios") {
+      put(box, head, h("ol", { class: "install-steps" }, h("li", { text: "사파리 아래쪽의 공유 버튼(네모에서 화살표가 올라가는 모양)을 누릅니다." }), h("li", { text: "‘홈 화면에 추가’를 누릅니다." })));
+    } else {
+      const open = h("a", { class: "install-button", href: `kakaotalk://web/openExternal?url=${encodeURIComponent(location.href)}`, text: "다른 브라우저로 열기" });
+      put(box, head, h("p", { class: "install-note", text: "지금 화면(카카오톡 같은 앱 속 화면)에서는 설치할 수 없습니다. 삼성 인터넷이나 크롬으로 열어 주세요." }),
+        /KAKAOTALK/i.test(navigator.userAgent || "") ? open : null,
+        h("p", { class: "install-note", text: "버튼이 듣지 않으면 오른쪽 위(또는 아래) 메뉴에서 ‘다른 브라우저로 열기’를 누르세요." }));
+    }
+  }
+  window.addEventListener("beforeinstallprompt", (event) => { event.preventDefault(); installEvent = event; renderInstall(); });
+  window.addEventListener("appinstalled", () => { installEvent = null; renderInstall(); });
+  setTimeout(() => { installWaited = true; renderInstall(); }, INSTALL_WAIT_MS);
+  renderInstall();
 })();

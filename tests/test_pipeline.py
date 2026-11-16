@@ -750,6 +750,25 @@ class RailPageTest(unittest.TestCase):
         worker = (self.WEB / "sw.js").read_text(encoding="utf-8")
         self.assertIn('"home.js?v=__BUILD__"', worker)
 
+    def test_first_screen_offers_app_install_only_when_possible(self):
+        """설치형 웹앱: 브라우저가 설치할 수 있다고 알릴 때만 '설치하기'를 보이고, 그 신호가 없는 곳(아이폰·앱 속 화면)은 방법을 적는다. 이미 앱으로 열었으면 숨긴다."""
+        import json
+
+        html = (self.WEB / "index.html").read_text(encoding="utf-8")
+        script = (self.WEB / "home.js").read_text(encoding="utf-8")
+        self.assertIn('id="install" aria-label="앱으로 설치" hidden', html)  # 기본은 숨김
+        body = html[html.index("<main"):html.index("</main>")]
+        self.assertLess(body.index('id="map"'), body.index('id="install"'))  # 지도 아래, 검증 위
+        self.assertLess(body.index('id="install"'), body.index('id="proof"'))
+        for needle in ('"beforeinstallprompt"', "event.preventDefault()", ".prompt()", '"appinstalled"', "display-mode: standalone", "navigator.standalone",
+                       "KAKAOTALK", "홈 화면에 추가", "INSTALL_KEY"):
+            self.assertIn(needle, script, needle)
+        manifest = json.loads((self.WEB / "manifest.webmanifest").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["display"], "standalone")
+        self.assertEqual({icon["sizes"] for icon in manifest["icons"]} >= {"192x192", "512x512"}, True)
+        self.assertEqual(manifest["background_color"], "#111b38")  # 켜질 때의 바탕 = 첫 화면의 밤하늘 색
+        self.assertIn("background: #111b38", (self.WEB / "style.css").read_text(encoding="utf-8"))
+
     def test_first_screen_map_shows_stations_and_survives_forced_dark(self):
         """지도에 역 위치·노선을 겹치고, 역 이름으로도 지역을 찾는다. 이름표는 그림 안의 글자가 아니라 보통 글자로 얹는다(브라우저의 강제 다크 모드에서도 읽히게)."""
         html = (self.WEB / "index.html").read_text(encoding="utf-8")
