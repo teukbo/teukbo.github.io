@@ -24,3 +24,17 @@ python3 tools/rain_study.py --models base --save tools/cache/rain_base.json.gz
 ```
 
 출처: [Weather data by Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0). 실제 특보는 `data/rail/events` 의 기상청 발표 기록.
+
+## 긴 기간 확인용 자료 (2024-07 ~)
+
+| 파일 | 내용 |
+|---|---|
+| `rain_<모델>_<첫날>.json.gz` (20개) | 위와 같은 형식의 강수량 과거 예보를 모델·반년 단위로 나눠 받은 것(2024-07-01 ~ 2026-09-11). `rain_base.json.gz` 와 이어 붙여 쓴다 |
+| `asos_daily.json.gz` | 기상청 종관기상관측(ASOS) **일자료** — 94개 관측소의 날짜별 일강수량·1시간 최다강수량·최대 풍속·최대 순간풍속·최저/최고 기온·평균 습도·일 최심신적설 (2024-07-01 ~ 2026-11-15) |
+
+```bash
+python3 tools/rain_longcheck.py                                   # 표만 찍기
+python3 tools/rain_longcheck.py --json data/rain_longcheck.json   # 첫 화면에 싣는 요약도 저장
+```
+
+관측 자료 출처: 기상청(공공데이터포털 「기상청_지상(종관, ASOS) 일자료 조회서비스」). 받는 법: `tools/asos_fetch.py --daily` (인증키 필요 — 작업용 가지에서 Actions “과거 검증”을 regions=4 로 실행).

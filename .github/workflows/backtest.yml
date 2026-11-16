@@ -86,6 +86,31 @@ jobs:
           done
           exit 1
 
+  # 작업용 가지에서 regions=4 로 직접 실행하면: 관측 일자료(하루 단위)를 한 파일로 받아 그 가지의 tools/cache 에 저장한다(연구용)
+  asos-daily-archive:
+    name: 관측 일자료 받기
+    if: ${{ github.ref != 'refs/heads/main' && inputs.regions == '4' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: 받아서 저장
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+        run: |
+          file="tools/cache/asos_daily.json.gz"
+          end="$(TZ=Asia/Seoul date -d '2 days ago' +%F)"
+          python3 tools/asos_fetch.py --daily --start 2024-07-01 --end "$end" --out "$file"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f "$file"
+          git commit -m "연구용 자료: 기상청 관측 일자료(ASOS) 2024-07-01 ~ ${end}"
+          for attempt in 1 2 3 4 5; do
+            if git push; then exit 0; fi
+            sleep $((attempt * 5)); git pull --rebase
+          done
+          exit 1
+
   backtest:
     name: 과거 검증
     if: ${{ github.ref == 'refs/heads/main' }}

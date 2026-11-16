@@ -162,6 +162,27 @@ def check_asos(key, now, opts: dict) -> None:
     except FetchError as e:
         print(f"  지점 목록 요청 실패: {str(e)[:200]}")
 
+    # 일자료는 시간자료와 따로 활용신청하는 별개 서비스다(한쪽만 승인되어 있을 수 있다).
+    print("\n[실제 관측 (검증용 · 기상청 ASOS 일자료)]")
+    today = now.date()
+    for label, station, start, end in [("최근 1주", "108", today - timedelta(days=9), today - timedelta(days=2)),
+                                       ("2024-07 한 달", "174", datetime(2024, 7, 1).date(), datetime(2024, 7, 31).date()),
+                                       ("2025-07-15~20", "156", datetime(2025, 7, 15).date(), datetime(2025, 7, 20).date()),
+                                       ("2024-07-01~2026-11-10 (한 번에 몇 행까지 오는지)", "108", datetime(2024, 7, 1).date(), datetime(2026, 11, 10).date())]:
+        started = time.monotonic()
+        try:
+            rows = asos.fetch_daily(key, station, start, end, opts)
+        except FetchError as e:
+            print(f"  실패  {label} 지점 {station}: {str(e)[:200]}")
+            continue
+        if not rows:
+            print(f"  자료 없음  {label} 지점 {station}")
+            continue
+        have = {name: sum(1 for r in rows if r[name] is not None) for name in asos.DAILY_FIELDS.values()}
+        wettest = max(rows, key=lambda r: r["rain"] or 0)
+        print(f"  정상  {label} 지점 {station}({rows[0]['name']}): {len(rows)}일 · 값 있는 날 수 {have} · 강수 합계 {sum(r['rain'] or 0 for r in rows):.1f}mm"
+              f" · 가장 많이 온 날 {wettest['d']} {wettest['rain']}mm(1시간 최다 {wettest['rain_1h_max']}) · {time.monotonic() - started:.1f}초")
+
 
 def check_live(cfg, now, data_go_kr_key, apihub_key, opts: dict) -> None:
     """초단기실황·초단기예보의 실제 응답을 그대로 보여 주고, 실시간 자료 한 벌을 끝까지 만들어 본다(저장하지 않음)."""

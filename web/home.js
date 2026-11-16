@@ -7,6 +7,7 @@
  *  geo/rail.json · geo/stations.json  철도 노선과 역 위치(지도에 겹쳐 그린다. 역 이름으로도 지역을 찾는다). 없어도 화면은 동작한다
  *  data/detail/<지역>.json  그 지역의 시간별 예보 값(모델별) — 고른 지역의 '앞으로 48시간 날씨'를 적는 데 쓴다. 없으면 그 칸을 뺀다
  *  data/backtest.json 과거 검증 — 지난 예보로 가능성을 다시 계산해 실제 특보와 맞춰 본 결과(teukbo.backtest). 없으면 그 구역을 숨긴다
+ *  data/rain_longcheck.json 호우를 더 긴 기간(2년 남짓)으로 본 확인 — 실제 결과를 기상청 관측 일강수량으로 바꿔 맞춰 본 것(tools/rain_longcheck.py). 없으면 그 부분만 뺀다
  * 화면의 상태는 둘뿐이다: 지역을 고르지 않았으면 전국 지도와 전국 요약, 골랐으면 그 지역의 가능성과 그 주변 지도.
  * 원칙: 받아 온 글은 늘 텍스트로 넣는다. 공식 특보가 있으면 가능성보다 먼저 보여 준다.
  */
@@ -23,7 +24,7 @@
   const RAIN_MODEL_MM = 1.0, RAIN_START_MM = 0.3, SNOW_MIN_CM = 1.0;  // 날씨 요약: 48시간 합계가 이만큼이면 '비 예상'으로, 3시간 합계가 이만큼 되면 '시작'으로 본다  // 지도 위 이름표의 글자 크기(px) — style.css 의 .map-label · .map-station-name 과 같게
   const NEAR_COUNT = 16, NEAR_MIN = 12, NEAR_MAX = 42;  // 고른 지역 둘레를 얼마나 넓게 보여 줄지(이웃 지역 수 기준, 지도 단위 ≈ 1.7km)
   const MIN_PROOF_CASES = 30, MIN_PROOF_DAYS = 3;  // 과거 검증 값을 가능성 옆에 적으려면: 표본 30회 이상, 특보가 있었던 날 3일 이상
-  const state = { base: null, latest: null, live: null, zones: null, proof: null, region: null, query: "", paths: new Map(), centers: new Map(), labels: new Map(), svg: null, overlay: null, wideBox: null, liveTimer: null,
+  const state = { base: null, latest: null, live: null, zones: null, proof: null, longRain: null, region: null, query: "", paths: new Map(), centers: new Map(), labels: new Map(), svg: null, overlay: null, wideBox: null, liveTimer: null,
     rail: [], stations: [], stationsOf: new Map(),
     view: null,  // 지도를 직접 확대·이동했을 때의 보는 범위 [x, y, w, h]. null 이면 기본 범위(전국 또는 고른 지역 둘레)
     details: new Map() };  // `${지역 id}@${계산 시각}` → 시간별 예보(받는 중이면 "loading", 못 받았으면 null)  // stations: [{name, x, y, region}], stationsOf: 지역 id → 그 지역의 역 이름들
@@ -379,6 +380,36 @@
       h("ul", null, (proof.notes || []).map((text) => h("li", { text })),
         (proof.types_without_events || []).length ? h("li", { text: `이 기간에 실제 특보가 없어 검증하지 못한 종류: ${proof.types_without_events.join(", ")}` }) : null,
         h("li", { text: "가능성 옆의 ‘과거 검증’ 한 줄은 표본 30회 이상·특보가 있었던 날 3일 이상일 때만 적습니다." }))));
+    const longRain = longRainBlock(state.longRain);
+    if (longRain) box.append(longRain);
+  }
+
+  /** 호우를 더 긴 기간으로 본 확인(관측 일강수량 기준). 위의 표와 잣대가 달라 구역을 따로 두고, 무엇을 센 것인지 먼저 적는다. */
+  function longRainBlock(doc) {
+    if (!doc || !doc.period || !doc.events) return null;
+    const count = (n) => Number(n || 0).toLocaleString("ko-KR");
+    const month = (text) => { const [y, m] = String(text).split("-"); return `${y}년 ${Number(m)}월`; };
+    const mm = Number(doc.heavy_mm), before = doc.before_area_score || {}, high = doc.high || {}, zero = (doc.calibration || [])[0] || {}, unseen = doc.unseen || {};
+    const tile = (label, value, sub) => h("div", { class: "tile" }, h("p", { class: "label", text: label }), h("p", { class: "value", text: value }), h("p", { class: "sub", text: sub }));
+    const box = h("div", { class: "proof-long" },
+      h("h3", { text: "호우는 더 긴 기간으로도 확인했습니다" }),
+      h("p", { class: "proof-lede", text: `${month(doc.period.from)} ~ ${month(doc.period.to)}, 관측소가 있는 ${count(doc.regions)}개 지역을 매일 0시 기준으로 다시 계산해(${count(doc.period.replays)}회) 실제로 내린 비와 맞춰 본 결과입니다. 여기서 ‘큰비’는 그 지역 관측소의 하루 강수량 ${mm}mm 이상입니다 — 특보 발표 기록은 60일 전까지만 받을 수 있어, 오래된 기간은 관측값으로 대신했습니다(위 표와 잣대가 다릅니다). 큰비 ${count(doc.events)}건 · 큰비가 온 날 ${count(doc.event_days)}일.` }),
+      h("div", { class: "tiles proof-tiles" },
+        tile("큰비를 전날 잡아낸 비율", share(doc.day_before, doc.events), `큰비 ${count(doc.events)}건 중 ${count(doc.day_before)}건이 전날 0시에 ‘주의’ 이상${before.events ? ` · 주변 지역을 보기 전 계산식으로는 ${share(before.day_before, before.events)}` : ""}`),
+        tile("‘높음’ 뒤에 큰비가 온 비율", share(high.hits, high.alerts), `${count(high.alerts)}번 표시 중 ${count(high.hits)}번이 이틀 안에 큰비`),
+        tile("0% 뒤에 큰비가 온 비율", share(zero.hits, zero.cases), `${count(zero.cases)}번 중 ${count(zero.hits)}번`)));
+    const rows = (doc.calibration || []).filter((row) => row.cases);
+    if (rows.length) {
+      box.append(h("div", { class: "table-scroll" }, h("table", { class: "fit proof-table" },
+        h("thead", null, h("tr", null, h("th", { scope: "col", text: "표시한 호우주의보 가능성" }), h("th", { scope: "col", text: "횟수" }), h("th", { scope: "col" }, "큰비로 이어짐", h("small", null, "이틀 안")))),
+        h("tbody", null, rows.map((row) => h("tr", null, h("th", { scope: "row", text: row.bucket }), h("td", { text: count(row.cases) }), h("td", null, share(row.hits, row.cases), h("small", null, `${count(row.hits)}번`))))))));
+    }
+    const periods = (doc.by_period || []).filter((row) => row.events);
+    box.append(h("details", { class: "proof-notes" }, h("summary", { text: "어떻게 확인했나 · 한계 · 기간별" }),
+      h("ul", null, (doc.notes || []).map((text) => h("li", { text })),
+        unseen.events ? h("li", { text: `기준을 맞출 때 보지 않은 기간(~ ${unseen.until})만: 큰비 ${count(unseen.events)}건 중 전날 ‘주의’ 이상 ${count(unseen.day_before)}건(${share(unseen.day_before, unseen.events)})${(unseen.before_area_score || {}).events ? `, 주변 지역을 보기 전 계산식으로는 ${share(unseen.before_area_score.day_before, unseen.before_area_score.events)}` : ""}.` }) : null,
+        periods.length ? h("li", { text: `기간별 전날 포착: ${periods.map((row) => `${row.name} ${share(row.day_before, row.events)}(${count(row.day_before)}/${count(row.events)})`).join(" · ")}.` }) : null)));
+    return box;
   }
 
   // ------------------------------------------------------------ 지도
@@ -624,9 +655,11 @@
 
   async function load() {
     try {
-      const [latest, zones, proof, rail, stations] = await Promise.all([getJson("data/latest.json"), state.zones || getJson("geo/zones.json"), getJson("data/backtest.json").catch(() => null),
-        state.rail.length ? state.rail : getJson("geo/rail.json").catch(() => []), state.stationList || getJson("geo/stations.json").catch(() => [])]);
+      const [latest, zones, proof, rail, stations, longRain] = await Promise.all([getJson("data/latest.json"), state.zones || getJson("geo/zones.json"), getJson("data/backtest.json").catch(() => null),
+        state.rail.length ? state.rail : getJson("geo/rail.json").catch(() => []), state.stationList || getJson("geo/stations.json").catch(() => []),
+        state.longRain || getJson("data/rain_longcheck.json").catch(() => null)]);
       state.proof = proof || state.proof;
+      state.longRain = longRain || state.longRain;
       state.rail = Array.isArray(rail) ? rail : []; state.stationList = Array.isArray(stations) ? stations : [];
       const first = !state.base;
       state.base = latest; state.zones = zones;
