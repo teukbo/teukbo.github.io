@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-17T14:25+09:00",
+  "updated_at": "2026-11-17T17:25+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-17T14:25+09:00",
-    "runs": 61,
+    "to": "2026-11-17T17:25+09:00",
+    "runs": 62,
     "window_days": 365
   },
   "lead_hours": [
@@ -13,24 +13,24 @@
     24
   ],
   "horizon_hours": 48,
-  "events": 1,
+  "events": 3,
   "capture": {
     "12": {
-      "events": 1,
+      "events": 3,
       "captured": 0,
       "rate": 0.0
     },
     "24": {
-      "events": 1,
+      "events": 3,
       "captured": 0,
       "rate": 0.0
     }
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 43,
-      "false": 43,
-      "rate": 1.0
+      "alerts": 45,
+      "false": 44,
+      "rate": 0.978
     },
     "high": {
       "alerts": 0,
@@ -41,17 +41,17 @@
   "by_type": {
     "heavy_rain": {
       "name": "호우",
-      "events": 0,
+      "events": 2,
       "capture": {
         "12": {
-          "events": 0,
+          "events": 2,
           "captured": 0,
-          "rate": null
+          "rate": 0.0
         },
         "24": {
-          "events": 0,
+          "events": 2,
           "captured": 0,
-          "rate": null
+          "rate": 0.0
         }
       },
       "false_alarm": {
@@ -84,9 +84,9 @@
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 19,
-          "false": 19,
-          "rate": 1.0
+          "alerts": 21,
+          "false": 20,
+          "rate": 0.952
         },
         "high": {
           "alerts": 0,
@@ -125,6 +125,24 @@
     }
   },
   "recent_events": [
+    {
+      "region": "L1091430",
+      "hazard": "heavy_rain_advisory",
+      "time": "2026-11-17T16:35+09:00",
+      "grades": {
+        "12": "low",
+        "24": "low"
+      }
+    },
+    {
+      "region": "L1091340",
+      "hazard": "heavy_rain_advisory",
+      "time": "2026-11-17T15:50+09:00",
+      "grades": {
+        "12": "low",
+        "24": "low"
+      }
+    },
     {
       "region": "L1072100",
       "hazard": "strong_wind_advisory",
