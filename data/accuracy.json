@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-18T05:25+09:00",
+  "updated_at": "2026-11-18T08:25+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-18T05:25+09:00",
-    "runs": 66,
+    "to": "2026-11-18T08:25+09:00",
+    "runs": 67,
     "window_days": 365
   },
   "lead_hours": [
@@ -13,24 +13,24 @@
     24
   ],
   "horizon_hours": 48,
-  "events": 4,
+  "events": 5,
   "capture": {
     "12": {
-      "events": 4,
-      "captured": 1,
-      "rate": 0.25
+      "events": 5,
+      "captured": 2,
+      "rate": 0.4
     },
     "24": {
-      "events": 4,
-      "captured": 1,
-      "rate": 0.25
+      "events": 5,
+      "captured": 2,
+      "rate": 0.4
     }
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 59,
-      "false": 56,
-      "rate": 0.949
+      "alerts": 61,
+      "false": 58,
+      "rate": 0.951
     },
     "high": {
       "alerts": 0,
@@ -69,24 +69,24 @@
     },
     "strong_wind": {
       "name": "강풍",
-      "events": 2,
+      "events": 3,
       "capture": {
         "12": {
-          "events": 2,
-          "captured": 1,
-          "rate": 0.5
+          "events": 3,
+          "captured": 2,
+          "rate": 0.667
         },
         "24": {
-          "events": 2,
-          "captured": 1,
-          "rate": 0.5
+          "events": 3,
+          "captured": 2,
+          "rate": 0.667
         }
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 35,
-          "false": 32,
-          "rate": 0.914
+          "alerts": 37,
+          "false": 34,
+          "rate": 0.919
         },
         "high": {
           "alerts": 0,
@@ -125,6 +125,15 @@
     }
   },
   "recent_events": [
+    {
+      "region": "sinan",
+      "hazard": "strong_wind_advisory",
+      "time": "2026-11-18T08:25+09:00",
+      "grades": {
+        "12": "caution",
+        "24": "caution"
+      }
+    },
     {
       "region": "L1014200",
       "hazard": "strong_wind_advisory",
