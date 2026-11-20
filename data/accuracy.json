@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-20T20:25+09:00",
+  "updated_at": "2026-11-20T23:25+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-20T20:25+09:00",
-    "runs": 87,
+    "to": "2026-11-20T23:25+09:00",
+    "runs": 88,
     "window_days": 365
   },
   "lead_hours": [
@@ -13,29 +13,29 @@
     24
   ],
   "horizon_hours": 48,
-  "events": 111,
+  "events": 113,
   "capture": {
     "12": {
-      "events": 111,
-      "captured": 70,
-      "rate": 0.631
+      "events": 113,
+      "captured": 72,
+      "rate": 0.637
     },
     "24": {
-      "events": 111,
+      "events": 113,
       "captured": 72,
-      "rate": 0.649
+      "rate": 0.637
     }
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 3372,
-      "false": 2282,
-      "rate": 0.677
+      "alerts": 3506,
+      "false": 2395,
+      "rate": 0.683
     },
     "high": {
-      "alerts": 544,
-      "false": 253,
-      "rate": 0.465
+      "alerts": 568,
+      "false": 273,
+      "rate": 0.481
     }
   },
   "by_type": {
@@ -84,37 +84,37 @@
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 2238,
-          "false": 1407,
-          "rate": 0.629
+          "alerts": 2279,
+          "false": 1440,
+          "rate": 0.632
         },
         "high": {
-          "alerts": 314,
-          "false": 106,
+          "alerts": 320,
+          "false": 108,
           "rate": 0.338
         }
       }
     },
     "heavy_snow": {
       "name": "대설",
-      "events": 27,
+      "events": 29,
       "capture": {
         "12": {
-          "events": 27,
-          "captured": 19,
-          "rate": 0.704
+          "events": 29,
+          "captured": 21,
+          "rate": 0.724
         },
         "24": {
-          "events": 27,
+          "events": 29,
           "captured": 18,
-          "rate": 0.667
+          "rate": 0.621
         }
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 150,
-          "false": 75,
-          "rate": 0.5
+          "alerts": 179,
+          "false": 91,
+          "rate": 0.508
         },
         "high": {
           "alerts": 0,
@@ -140,19 +140,37 @@
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 975,
-          "false": 791,
-          "rate": 0.811
+          "alerts": 1039,
+          "false": 855,
+          "rate": 0.823
         },
         "high": {
-          "alerts": 230,
-          "false": 147,
-          "rate": 0.639
+          "alerts": 248,
+          "false": 165,
+          "rate": 0.665
         }
       }
     }
   },
   "recent_events": [
+    {
+      "region": "L1061510",
+      "hazard": "heavy_snow_advisory",
+      "time": "2026-11-20T23:20+09:00",
+      "grades": {
+        "12": "caution",
+        "24": "low"
+      }
+    },
+    {
+      "region": "L1060100",
+      "hazard": "heavy_snow_advisory",
+      "time": "2026-11-20T23:20+09:00",
+      "grades": {
+        "12": "caution",
+        "24": "low"
+      }
+    },
     {
       "region": "yeonggwang",
       "hazard": "heavy_snow_advisory",
@@ -310,24 +328,6 @@
       "region": "L1083120",
       "hazard": "heavy_snow_advisory",
       "time": "2026-11-19T23:50+09:00",
-      "grades": {
-        "12": "caution",
-        "24": "caution"
-      }
-    },
-    {
-      "region": "L1091440",
-      "hazard": "strong_wind_advisory",
-      "time": "2026-11-19T23:25+09:00",
-      "grades": {
-        "12": "caution",
-        "24": "caution"
-      }
-    },
-    {
-      "region": "L1091430",
-      "hazard": "strong_wind_advisory",
-      "time": "2026-11-19T23:25+09:00",
       "grades": {
         "12": "caution",
         "24": "caution"
