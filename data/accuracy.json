@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-21T17:25+09:00",
+  "updated_at": "2026-11-21T20:26+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-21T17:25+09:00",
-    "runs": 94,
+    "to": "2026-11-21T20:26+09:00",
+    "runs": 95,
     "window_days": 365
   },
   "lead_hours": [
@@ -28,13 +28,13 @@
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 4062,
-      "false": 2825,
-      "rate": 0.695
+      "alerts": 4147,
+      "false": 2888,
+      "rate": 0.696
     },
     "high": {
-      "alerts": 633,
-      "false": 324,
+      "alerts": 639,
+      "false": 327,
       "rate": 0.512
     }
   },
@@ -84,14 +84,14 @@
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 2507,
-          "false": 1622,
-          "rate": 0.647
+          "alerts": 2555,
+          "false": 1660,
+          "rate": 0.65
         },
         "high": {
-          "alerts": 341,
-          "false": 117,
-          "rate": 0.343
+          "alerts": 344,
+          "false": 119,
+          "rate": 0.346
         }
       }
     },
@@ -112,12 +112,12 @@
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 328,
-          "false": 160,
-          "rate": 0.488
+          "alerts": 357,
+          "false": 177,
+          "rate": 0.496
         },
         "high": {
-          "alerts": 2,
+          "alerts": 4,
           "false": 0,
           "rate": 0.0
         }
@@ -140,14 +140,14 @@
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 1218,
-          "false": 1034,
-          "rate": 0.849
+          "alerts": 1226,
+          "false": 1042,
+          "rate": 0.85
         },
         "high": {
-          "alerts": 290,
-          "false": 207,
-          "rate": 0.714
+          "alerts": 291,
+          "false": 208,
+          "rate": 0.715
         }
       }
     }
