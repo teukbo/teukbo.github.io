@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-23T17:25+09:00",
+  "updated_at": "2026-11-23T20:25+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-23T17:25+09:00",
-    "runs": 111,
+    "to": "2026-11-23T20:25+09:00",
+    "runs": 112,
     "window_days": 365
   },
   "lead_hours": [
@@ -13,17 +13,17 @@
     24
   ],
   "horizon_hours": 48,
-  "events": 154,
+  "events": 156,
   "capture": {
     "12": {
-      "events": 154,
+      "events": 156,
       "captured": 99,
-      "rate": 0.643
+      "rate": 0.635
     },
     "24": {
-      "events": 154,
+      "events": 156,
       "captured": 102,
-      "rate": 0.662
+      "rate": 0.654
     }
   },
   "false_alarm": {
@@ -97,17 +97,17 @@
     },
     "heavy_snow": {
       "name": "대설",
-      "events": 34,
+      "events": 36,
       "capture": {
         "12": {
-          "events": 34,
+          "events": 36,
           "captured": 24,
-          "rate": 0.706
+          "rate": 0.667
         },
         "24": {
-          "events": 34,
+          "events": 36,
           "captured": 21,
-          "rate": 0.618
+          "rate": 0.583
         }
       },
       "false_alarm": {
@@ -153,6 +153,24 @@
     }
   },
   "recent_events": [
+    {
+      "region": "L1022920",
+      "hazard": "heavy_snow_advisory",
+      "time": "2026-11-23T18:30+09:00",
+      "grades": {
+        "12": "low",
+        "24": "low"
+      }
+    },
+    {
+      "region": "L1022220",
+      "hazard": "heavy_snow_advisory",
+      "time": "2026-11-23T18:30+09:00",
+      "grades": {
+        "12": "low",
+        "24": "low"
+      }
+    },
     {
       "region": "L1072100",
       "hazard": "strong_wind_advisory",
@@ -313,24 +331,6 @@
       "grades": {
         "12": "high",
         "24": "caution"
-      }
-    },
-    {
-      "region": "L1031920",
-      "hazard": "strong_wind_advisory",
-      "time": "2026-11-23T11:00+09:00",
-      "grades": {
-        "12": "caution",
-        "24": "caution"
-      }
-    },
-    {
-      "region": "L1032020",
-      "hazard": "strong_wind_advisory",
-      "time": "2026-11-23T11:00+09:00",
-      "grades": {
-        "12": "low",
-        "24": "low"
       }
     }
   ]
