@@ -1,10 +1,10 @@
 {
   "schema": 2,
-  "updated_at": "2026-11-16T08:10+09:00",
+  "updated_at": "2026-11-23T08:48+09:00",
   "period": {
     "from": "2026-09-19T15:00+09:00",
-    "to": "2026-11-14T03:00+09:00",
-    "replays": 223,
+    "to": "2026-11-21T03:00+09:00",
+    "replays": 251,
     "step_hours": 6
   },
   "regions": 226,
@@ -19,47 +19,47 @@
     12,
     24
   ],
-  "events": 640,
-  "event_days": 23,
+  "events": 760,
+  "event_days": 29,
   "capture": {
     "12": {
-      "events": 640,
-      "captured": 439,
-      "rate": 0.686
+      "events": 760,
+      "captured": 519,
+      "rate": 0.683
     },
     "24": {
-      "events": 640,
-      "captured": 448,
-      "rate": 0.7
+      "events": 760,
+      "captured": 523,
+      "rate": 0.688
     }
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 7002,
-      "false": 3986,
-      "rate": 0.569
+      "alerts": 8781,
+      "false": 5249,
+      "rate": 0.598
     },
     "high": {
-      "alerts": 1061,
-      "false": 336,
-      "rate": 0.317
+      "alerts": 1365,
+      "false": 498,
+      "rate": 0.365
     }
   },
   "by_type": {
     "heavy_rain": {
       "name": "호우",
-      "events": 71,
-      "event_days": 7,
+      "events": 73,
+      "event_days": 8,
       "capture": {
         "12": {
-          "events": 71,
+          "events": 73,
           "captured": 41,
-          "rate": 0.577
+          "rate": 0.562
         },
         "24": {
-          "events": 71,
+          "events": 73,
           "captured": 42,
-          "rate": 0.592
+          "rate": 0.575
         }
       },
       "false_alarm": {
@@ -79,18 +79,18 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 95204,
-          "hits": 114,
+          "cases": 107837,
+          "hits": 130,
           "rate": 0.001,
-          "event_days": 6
+          "event_days": 7
         },
         {
           "bucket": "1~29% (낮음)",
           "from": 1,
           "to": 29,
-          "cases": 3827,
+          "cases": 3850,
           "hits": 117,
-          "rate": 0.031,
+          "rate": 0.03,
           "event_days": 5
         },
         {
@@ -115,30 +115,30 @@
     },
     "strong_wind": {
       "name": "강풍",
-      "events": 297,
-      "event_days": 20,
+      "events": 364,
+      "event_days": 24,
       "capture": {
         "12": {
-          "events": 297,
-          "captured": 179,
-          "rate": 0.603
+          "events": 364,
+          "captured": 222,
+          "rate": 0.61
         },
         "24": {
-          "events": 297,
-          "captured": 182,
-          "rate": 0.613
+          "events": 364,
+          "captured": 226,
+          "rate": 0.621
         }
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 2951,
-          "false": 1594,
-          "rate": 0.54
+          "alerts": 3880,
+          "false": 2201,
+          "rate": 0.567
         },
         "high": {
-          "alerts": 171,
-          "false": 28,
-          "rate": 0.164
+          "alerts": 286,
+          "false": 68,
+          "rate": 0.238
         }
       },
       "calibration": [
@@ -146,7 +146,7 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 60799,
+          "cases": 64834,
           "hits": 16,
           "rate": 0.0,
           "event_days": 4
@@ -155,57 +155,57 @@
           "bucket": "1~29% (낮음)",
           "from": 1,
           "to": 29,
-          "cases": 36343,
-          "hits": 941,
+          "cases": 43704,
+          "hits": 1135,
           "rate": 0.026,
-          "event_days": 17
+          "event_days": 20
         },
         {
           "bucket": "30~59% (주의)",
           "from": 30,
           "to": 59,
-          "cases": 2780,
-          "hits": 1214,
-          "rate": 0.437,
-          "event_days": 19
+          "cases": 3594,
+          "hits": 1461,
+          "rate": 0.407,
+          "event_days": 23
         },
         {
           "bucket": "60~100% (높음)",
           "from": 60,
           "to": 100,
-          "cases": 171,
-          "hits": 143,
-          "rate": 0.836,
-          "event_days": 10
+          "cases": 286,
+          "hits": 218,
+          "rate": 0.762,
+          "event_days": 11
         }
       ]
     },
     "heavy_snow": {
       "name": "대설",
-      "events": 1,
-      "event_days": 1,
+      "events": 36,
+      "event_days": 5,
       "capture": {
         "12": {
-          "events": 1,
-          "captured": 0,
-          "rate": 0.0
+          "events": 36,
+          "captured": 22,
+          "rate": 0.611
         },
         "24": {
-          "events": 1,
-          "captured": 0,
-          "rate": 0.0
+          "events": 36,
+          "captured": 16,
+          "rate": 0.444
         }
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 0,
-          "false": 0,
-          "rate": null
+          "alerts": 300,
+          "false": 196,
+          "rate": 0.653
         },
         "high": {
-          "alerts": 0,
-          "false": 0,
-          "rate": null
+          "alerts": 49,
+          "false": 30,
+          "rate": 0.612
         }
       },
       "calibration": [
@@ -213,66 +213,66 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 100792,
-          "hits": 8,
-          "rate": 0.0,
-          "event_days": 1
+          "cases": 112803,
+          "hits": 88,
+          "rate": 0.001,
+          "event_days": 5
         },
         {
           "bucket": "1~29% (낮음)",
           "from": 1,
           "to": 29,
-          "cases": 3,
-          "hits": 0,
-          "rate": 0.0,
-          "event_days": 0
+          "cases": 317,
+          "hits": 56,
+          "rate": 0.177,
+          "event_days": 3
         },
         {
           "bucket": "30~59% (주의)",
           "from": 30,
           "to": 59,
-          "cases": 0,
-          "hits": 0,
-          "rate": null,
-          "event_days": 0
+          "cases": 251,
+          "hits": 85,
+          "rate": 0.339,
+          "event_days": 4
         },
         {
           "bucket": "60~100% (높음)",
           "from": 60,
           "to": 100,
-          "cases": 0,
-          "hits": 0,
-          "rate": null,
-          "event_days": 0
+          "cases": 49,
+          "hits": 19,
+          "rate": 0.388,
+          "event_days": 1
         }
       ]
     },
     "cold_wave": {
       "name": "한파",
-      "events": 271,
-      "event_days": 4,
+      "events": 287,
+      "event_days": 5,
       "capture": {
         "12": {
-          "events": 271,
-          "captured": 219,
-          "rate": 0.808
+          "events": 287,
+          "captured": 234,
+          "rate": 0.815
         },
         "24": {
-          "events": 271,
-          "captured": 224,
-          "rate": 0.827
+          "events": 287,
+          "captured": 239,
+          "rate": 0.833
         }
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 2342,
-          "false": 1008,
-          "rate": 0.43
+          "alerts": 2892,
+          "false": 1468,
+          "rate": 0.508
         },
         "high": {
-          "alerts": 530,
-          "false": 124,
-          "rate": 0.234
+          "alerts": 670,
+          "false": 216,
+          "rate": 0.322
         }
       },
       "calibration": [
@@ -280,37 +280,37 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 85291,
-          "hits": 486,
+          "cases": 93551,
+          "hits": 516,
           "rate": 0.006,
-          "event_days": 4
+          "event_days": 5
         },
         {
           "bucket": "1~29% (낮음)",
           "from": 1,
           "to": 29,
-          "cases": 12076,
-          "hits": 348,
-          "rate": 0.029,
-          "event_days": 4
+          "cases": 15890,
+          "hits": 356,
+          "rate": 0.022,
+          "event_days": 5
         },
         {
           "bucket": "30~59% (주의)",
           "from": 30,
           "to": 59,
-          "cases": 1812,
-          "hits": 928,
-          "rate": 0.512,
-          "event_days": 3
+          "cases": 2222,
+          "hits": 970,
+          "rate": 0.437,
+          "event_days": 4
         },
         {
           "bucket": "60~100% (높음)",
           "from": 60,
           "to": 100,
-          "cases": 530,
-          "hits": 406,
-          "rate": 0.766,
-          "event_days": 2
+          "cases": 670,
+          "hits": 454,
+          "rate": 0.678,
+          "event_days": 3
         }
       ]
     },
@@ -347,7 +347,7 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 151190,
+          "cases": 170174,
           "hits": 0,
           "rate": 0.0,
           "event_days": 0
@@ -414,7 +414,7 @@
           "bucket": "0%",
           "from": 0,
           "to": 0,
-          "cases": 50398,
+          "cases": 56726,
           "hits": 0,
           "rate": 0.0,
           "event_days": 0
@@ -454,37 +454,37 @@
       "bucket": "0%",
       "from": 0,
       "to": 0,
-      "cases": 543674,
-      "hits": 624,
+      "cases": 605925,
+      "hits": 750,
       "rate": 0.001,
-      "event_days": 12
+      "event_days": 17
     },
     {
       "bucket": "1~29% (낮음)",
       "from": 1,
       "to": 29,
-      "cases": 52253,
-      "hits": 1406,
-      "rate": 0.027,
-      "event_days": 18
+      "cases": 63765,
+      "hits": 1664,
+      "rate": 0.026,
+      "event_days": 22
     },
     {
       "bucket": "30~59% (주의)",
       "from": 30,
       "to": 59,
-      "cases": 5941,
-      "hits": 2291,
-      "rate": 0.386,
-      "event_days": 20
+      "cases": 7416,
+      "hits": 2665,
+      "rate": 0.359,
+      "event_days": 25
     },
     {
       "bucket": "60~100% (높음)",
       "from": 60,
       "to": 100,
-      "cases": 1061,
-      "hits": 725,
-      "rate": 0.683,
-      "event_days": 12
+      "cases": 1365,
+      "hits": 867,
+      "rate": 0.635,
+      "event_days": 14
     }
   ],
   "types_without_events": [
