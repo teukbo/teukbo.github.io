@@ -111,6 +111,9 @@ def main() -> int:
     print("\n[실시간 자료] (초단기실황·초단기예보 — 몇 분마다 도는 live.yml 이 쓰는 것)")
     check_live(cfg, now, data_go_kr_key, apihub_key, opts)
 
+    print("\n[시간별 실황 — 지난 시각] (초단기실황을 과거 기준시각으로 조회: 몇 시간 전 것까지 오는지, 전국을 받는 데 얼마나 걸리는지)")
+    check_ncst_history(cfg, now, data_go_kr_key, opts)
+
     print("\n[선로 강우] (기상청 레이더 합성영상을 직접 읽음 — 인증키 없이)")
     check_radar(now, opts)
 
@@ -217,6 +220,57 @@ def check_live(cfg, now, data_go_kr_key, apihub_key, opts: dict) -> None:
         entry = doc["regions"][r.id]
         print(f"        {r.name}: 지금 {entry.get('now')}")
         print("          6시간 " + " | ".join(f"{row['t'][11:13]}시 {row['temp']}℃ 비 {row['rain'] or '없음'} 바람 {row['wind']}" for row in entry.get("fcst", [])))
+
+
+def check_ncst_history(cfg, now, data_go_kr_key, opts: dict) -> None:
+    """초단기실황을 지난 기준시각으로 조회해 본다 — 시간별 기록(teukbo/hourly.py)이 기대는 사실을 실제 응답으로 확인한다.
+
+    ① 몇 시간 전 기준시각까지 값이 오는가(조회 가능 기간) ② 같은 기준시각을 다시 물으면 같은 값이 오는가
+    ③ 격자 여러 곳을 동시에 받을 때 걸리는 시간(전국 225격자 × 3시각을 한 번에 받는 데 드는 시간 어림).
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    if not data_go_kr_key:
+        print("  건너뜀 (공공데이터포털 인증키 미설정)")
+        return
+    url = f"{kma_ultra.DATA_GO_KR_BASE}/getUltraSrtNcst"
+    region = cfg.regions[0]
+    grid = (region.nx, region.ny)
+    latest = kma_ultra.base_time(kma_ultra.ncst_bases(now, count=1)[0])
+
+    def ask(hours_back: int, where=grid):
+        t = latest - timedelta(hours=hours_back)
+        return kma_ultra.parse_ncst(kma_ultra._fetch_grid(url, "serviceKey", data_go_kr_key, (t.strftime("%Y%m%d"), t.strftime("%H00")), where, opts, 1, "초단기실황"))
+
+    print(f"  기준 격자: {region.name} {grid[0]},{grid[1]} · 가장 최근 기준시각 {latest:%Y-%m-%d %H:%M}")
+    for back in (0, 1, 2, 3, 6, 12, 18, 21, 22, 23, 24, 25, 26, 30, 36, 48, 72):
+        t = latest - timedelta(hours=back)
+        try:
+            row = ask(back)
+        except FetchError as e:
+            print(f"  실패  {back:>2}시간 전 ({t:%m-%d %H시}): {str(e)[:150]}")
+            continue
+        print(f"  정상  {back:>2}시간 전 ({t:%m-%d %H시}): {row}")
+    try:
+        first, again = ask(2), ask(2)
+        print(f"  같은 기준시각(2시간 전)을 두 번: {'같은 값' if first == again else f'다른 값 {first} / {again}'}")
+    except FetchError as e:
+        print(f"  같은 기준시각 두 번 조회 실패: {str(e)[:120]}")
+    grids = sorted({(r.nx, r.ny) for r in cfg.regions})
+    sample = grids[:60]
+
+    def one(where):
+        try:
+            return ask(1, where) is not None
+        except FetchError:
+            return False
+
+    for workers in (kma_ultra.WORKERS, 12):
+        started = time.monotonic()
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            ok = sum(1 for good in pool.map(one, sample) if good)
+        took = time.monotonic() - started
+        print(f"  격자 {len(sample)}곳을 동시에 {workers}개씩: {took:.1f}초, 성공 {ok}곳 → 전국 {len(grids)}격자 × 3시각 어림 {took / len(sample) * len(grids) * 3:.0f}초")
 
 
 def check_radar(now, opts: dict) -> None:
