@@ -257,20 +257,26 @@ def check_ncst_history(cfg, now, data_go_kr_key, opts: dict) -> None:
     except FetchError as e:
         print(f"  같은 기준시각 두 번 조회 실패: {str(e)[:120]}")
     grids = sorted({(r.nx, r.ny) for r in cfg.regions})
-    sample = grids[:60]
 
-    def one(where):
+    def one(job):
+        back, where = job
+        started = time.monotonic()
         try:
-            return ask(1, where) is not None
+            good = ask(back, where) is not None
         except FetchError:
-            return False
+            good = False
+        return good, time.monotonic() - started
 
-    for workers in (kma_ultra.WORKERS, 12):
+    # 같은 (격자·시각)을 다시 물으면 서버가 저장해 둔 답을 줄 수 있어, 회차마다 다른 격자·다른 시각으로 잰다
+    for k, workers in enumerate((kma_ultra.WORKERS, 12, kma_ultra.WORKERS, 16)):
+        sample = [(k + 1, where) for where in grids[k * 50:(k + 1) * 50]]
         started = time.monotonic()
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            ok = sum(1 for good in pool.map(one, sample) if good)
+            results = list(pool.map(one, sample))
         took = time.monotonic() - started
-        print(f"  격자 {len(sample)}곳을 동시에 {workers}개씩: {took:.1f}초, 성공 {ok}곳 → 전국 {len(grids)}격자 × 3시각 어림 {took / len(sample) * len(grids) * 3:.0f}초")
+        each = sorted(seconds for _, seconds in results)
+        print(f"  격자 {len(sample)}곳({k + 1}시간 전)을 동시에 {workers}개씩: {took:.1f}초, 성공 {sum(1 for good, _ in results if good)}곳, 한 번에 중간 {each[len(each) // 2]:.2f}초·가장 느린 {each[-1]:.2f}초"
+              f" → 전국 {len(grids)}격자 × 3시각 어림 {took / len(sample) * len(grids) * 3:.0f}초")
 
 
 def check_radar(now, opts: dict) -> None:
