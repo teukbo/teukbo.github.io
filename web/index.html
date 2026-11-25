@@ -34,6 +34,7 @@
       <p class="intro-title">기상특보 가능성</p>
     </div>
   </div>
+  <div class="sky-fx" aria-hidden="true"></div>
   <div class="notice" role="note">
     <svg class="notice-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 18.5 17h-17L10 2.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 8v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="14.6" r="1" fill="currentColor"/></svg>
     <span>참고용입니다. 공식 특보·예비특보가 우선합니다.</span>
@@ -60,6 +61,9 @@
       <div class="finder-matches" id="matches" role="group" aria-label="찾은 지역"></div>
     </section>
 
+    <!-- 특보 종류 고르기: 고르면 가능성·지도·기록이 모두 그 종류만 보여 준다 -->
+    <div class="types" id="types" role="group" aria-label="특보 종류"></div>
+
     <section id="result" aria-live="polite" aria-label="고른 지역의 특보 가능성"></section>
 
     <section class="home-map" aria-label="지역별 특보 가능성 지도">
@@ -67,7 +71,14 @@
         <ul class="legend" id="legend"></ul>
         <button type="button" class="chip" id="back" hidden>전국 보기</button>
       </div>
+      <p class="map-what" id="map-what"></p>
       <div id="map"></div>
+    </section>
+
+    <!-- 특보 기록: 고른 지역에 특보가 언제 발효됐는지와 그날의 관측값(달력) -->
+    <section class="glass records" id="records" aria-labelledby="h-records">
+      <h2 id="h-records"><span id="records-title">특보 기록</span></h2>
+      <div id="records-body"></div>
     </section>
 
     <section class="proof" id="proof" aria-labelledby="h-proof" hidden>
@@ -104,6 +115,8 @@
   <noscript><p class="noscript">이 페이지는 자바스크립트가 필요합니다.</p></noscript>
   <script src="ui.js?v=__BUILD__" defer></script>
   <script src="live.js?v=__BUILD__" defer></script>
+  <script src="icons.js?v=__BUILD__" defer></script>
+  <script src="records.js?v=__BUILD__" defer></script>
   <script src="home.js?v=__BUILD__" defer></script>
 </body>
 </html>

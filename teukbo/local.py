@@ -120,6 +120,10 @@ def resolve_path(url_path: str, web_dir: Path, data_dir: Path) -> Path | None:
             return data_dir / "rail" / "days" / rest[1]
         if len(rest) == 2 and rest[0] == "detail" and rest[1].endswith(".json"):
             return data_dir / "detail" / rest[1]
+        if len(rest) == 2 and rest[0] == "records" and rest[1].endswith(".json"):  # 지역별 특보 기록(records_once 가 만든다)
+            return data_dir / "records" / rest[1]
+        if rest == ["work_rules.json"]:  # 폭염·한파 작업 기준(배포 때는 이 이름으로 복사된다)
+            return ROOT / "config" / "work_rules.json"
         return None
     return web_dir.joinpath(*parts) if parts else web_dir / "index.html"
 
@@ -262,6 +266,17 @@ def rail_once(cfg: Config, data_dir: Path, env: Mapping[str, str]) -> None:
         return
     period = (_read_quiet(data_dir / "rail" / "summary.json") or {}).get("period") or {}
     print(f"  열차 운행 기록: {period['from']} ~ {period['to']} ({period['days']}일)" if period.get("days") else "  열차 운행 기록: 아직 없습니다")
+
+
+def records_once(cfg: Config, data_dir: Path, env: Mapping[str, str]) -> None:
+    """관측 일자료를 이어 받고(인증키가 있을 때) 지역별 특보 기록을 다시 만든다 — 첫 화면의 '특보 기록'이 읽는다. 실패해도 넘어간다."""
+    try:
+        from . import obs, records
+
+        obs.run(cfg, now_kst().replace(second=0, microsecond=0), data_dir, env)
+        records.write_site_records(cfg, data_dir, data_dir / "records")
+    except Exception as e:  # noqa: BLE001
+        print(f"  특보 기록: 만들지 못했습니다 ({type(e).__name__}: {e})")
 
 
 # ---------------------------------------------------------------- 공개 사이트 갱신 신호 (선택)
@@ -528,6 +543,7 @@ def main(argv: list[str] | None = None) -> int:
                     time.sleep(3600)
             if ok:
                 rail_once(cfg, data_dir, env)
+                records_once(cfg, data_dir, env)
             pause = timedelta(hours=INTERVAL_HOURS) if ok else timedelta(minutes=RETRY_MINUTES)
             nxt = now_kst() + pause
             print(f"\n다음 예측 계산: {nxt:%H:%M}. 이 창을 열어 두면 실시간 자료는 계속 갱신됩니다. 닫으면 멈춥니다.\n", flush=True)
