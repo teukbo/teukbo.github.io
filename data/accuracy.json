@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-25T17:25+09:00",
+  "updated_at": "2026-11-25T20:05+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-25T17:25+09:00",
-    "runs": 127,
+    "to": "2026-11-25T20:05+09:00",
+    "runs": 128,
     "window_days": 365
   },
   "lead_hours": [
@@ -13,17 +13,17 @@
     24
   ],
   "horizon_hours": 48,
-  "events": 192,
+  "events": 194,
   "capture": {
     "12": {
-      "events": 192,
-      "captured": 125,
-      "rate": 0.651
+      "events": 194,
+      "captured": 127,
+      "rate": 0.655
     },
     "24": {
-      "events": 192,
-      "captured": 128,
-      "rate": 0.667
+      "events": 194,
+      "captured": 130,
+      "rate": 0.67
     }
   },
   "false_alarm": {
@@ -69,17 +69,17 @@
     },
     "strong_wind": {
       "name": "강풍",
-      "events": 137,
+      "events": 139,
       "capture": {
         "12": {
-          "events": 137,
-          "captured": 85,
-          "rate": 0.62
+          "events": 139,
+          "captured": 87,
+          "rate": 0.626
         },
         "24": {
-          "events": 137,
-          "captured": 91,
-          "rate": 0.664
+          "events": 139,
+          "captured": 93,
+          "rate": 0.669
         }
       },
       "false_alarm": {
@@ -153,6 +153,24 @@
     }
   },
   "recent_events": [
+    {
+      "region": "L1061630",
+      "hazard": "strong_wind_advisory",
+      "time": "2026-11-25T19:00+09:00",
+      "grades": {
+        "12": "caution",
+        "24": "caution"
+      }
+    },
+    {
+      "region": "L1014200",
+      "hazard": "strong_wind_advisory",
+      "time": "2026-11-25T19:00+09:00",
+      "grades": {
+        "12": "caution",
+        "24": "caution"
+      }
+    },
     {
       "region": "L1022920",
       "hazard": "strong_wind_advisory",
@@ -310,24 +328,6 @@
       "region": "L1022610",
       "hazard": "strong_wind_advisory",
       "time": "2026-11-24T09:40+09:00",
-      "grades": {
-        "12": "caution",
-        "24": "caution"
-      }
-    },
-    {
-      "region": "L1073120",
-      "hazard": "strong_wind_advisory",
-      "time": "2026-11-24T04:00+09:00",
-      "grades": {
-        "12": "caution",
-        "24": "low"
-      }
-    },
-    {
-      "region": "L1073020",
-      "hazard": "strong_wind_advisory",
-      "time": "2026-11-24T04:00+09:00",
       "grades": {
         "12": "caution",
         "24": "caution"
