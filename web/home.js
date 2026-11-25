@@ -932,6 +932,8 @@
     if (!intro || intro.dataset.closing) return;
     intro.dataset.closing = "1";
     try { sessionStorage.setItem("teukbo.intro", "1"); } catch (_) { /* 무시 */ }
+    // 인트로를 건너뛴 때(같은 탭에서 다시 연 때)는 기다릴 것도, 첫 그림을 다시 움직일 것도 없다 — 본문은 처음부터 보이고 있다
+    if (document.documentElement.classList.contains("no-intro")) { intro.remove(); return; }
     const wait = now ? 0 : Math.max(0, INTRO_MIN_MS - performance.now());
     setTimeout(() => {
       intro.classList.add("is-leaving");
