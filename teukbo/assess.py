@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from typing import Callable, Optional
 
 from .config import AllOf, Config, Hazard, Leaf, Region, Thresholds
-from .indicators import ModelSeries, Point, add_apparent_temp, in_horizon, indicator_points
+from .indicators import ModelSeries, Point, add_apparent_temp, add_feel_temp, in_horizon, indicator_points
 from .scoring import (
     GRADE_LOW,
     GRADE_RANK,
@@ -391,6 +391,7 @@ def assess_region(
     """한 지역의 모든 특보 가능성을 계산한다. series: 모델 id → 예측값."""
     for ms in series.values():
         add_apparent_temp(ms)
+        add_feel_temp(ms, cfg.settings.feel_summer_months)  # 화면에 보여 줄 체감온도(특보 판단에는 쓰지 않는다)
     model_ids = [m.id for m in cfg.settings.models if m.id in series]
     cache = _IndicatorCache(cfg.thresholds, series, now)
     hazards = [assess_hazard(h, cache, model_ids, official, cfg, now, region) for h in cfg.thresholds.hazards]

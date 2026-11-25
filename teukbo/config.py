@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any, Union
 
@@ -16,6 +17,9 @@ CONFIG_DIR = ROOT / "config"
 OPS = (">=", ">", "<=", "<")
 INDICATOR_KINDS = ("hourly", "rolling_sum", "period_extreme", "period_change")
 VARIABLES = ("precip", "snow", "temp", "apparent", "rh", "wind", "gust")
+# settings.json 에 값이 없을 때 쓰는 기본값
+DEFAULT_SUMMER_MONTHS = (5, 6, 7, 8, 9)  # feel.summer_months — 여름철 체감온도 식(기온·습도)을 쓰는 달
+DEFAULT_RECORDS = {"since": "2026-09-01", "obs_ready_hour": 11, "max_station_km": 40, "keep_days": 400, "obs_time_budget_seconds": 240}
 
 
 class ConfigError(ValueError):
@@ -166,6 +170,8 @@ class Settings:
     accuracy: dict[str, Any]
     http: dict[str, Any]
     stale_after_hours: float
+    feel_summer_months: tuple[int, ...] = DEFAULT_SUMMER_MONTHS  # 이 달에는 여름철 체감온도 식, 나머지 달에는 겨울철 식
+    records: dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_RECORDS))  # 관측 일자료 저장·지역별 기록(teukbo/obs.py · records.py)
     raw: dict[str, Any] = field(default_factory=dict, compare=False)
 
     def model(self, model_id: str) -> ModelDef:
@@ -406,6 +412,14 @@ def load_settings(path: Path | None = None) -> Settings:
     forecast_hours = int(_req(fetch, "forecast_hours", where))
     if forecast_hours < horizon:
         raise ConfigError("settings.json: fetch.forecast_hours 는 horizon_hours 이상이어야 합니다")
+    months = tuple(int(m) for m in (data.get("feel") or {}).get("summer_months", DEFAULT_SUMMER_MONTHS))
+    if any(not 1 <= m <= 12 for m in months):
+        raise ConfigError("settings.json feel: summer_months 는 1~12 의 달이어야 합니다")
+    records = {**DEFAULT_RECORDS, **{k: v for k, v in (data.get("records") or {}).items() if not k.startswith("_")}}
+    try:
+        date.fromisoformat(str(records["since"]))
+    except ValueError as e:
+        raise ConfigError("settings.json records: since 는 YYYY-MM-DD 날짜여야 합니다") from e
     return Settings(
         horizon_hours=horizon,
         past_hours=int(_req(fetch, "past_hours", where)),
@@ -417,6 +431,8 @@ def load_settings(path: Path | None = None) -> Settings:
         accuracy=dict(data.get("accuracy", {})),
         http=dict(data.get("http", {})),
         stale_after_hours=float(data.get("stale_after_hours", 7)),
+        feel_summer_months=months,
+        records=records,
         raw=data,
     )
 

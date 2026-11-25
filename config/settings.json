@@ -119,5 +119,27 @@
       {"min": 9000, "max": 9999, "name": "SRT"}
     ]
   },
+  "feel": {
+    "_doc": [
+      "체감온도(화면의 날씨·작업 기준 칸, 지역별 기록에 쓴다). 기상청의 두 식을 철에 따라 바꿔 쓴다(teukbo/indicators.py).",
+      "summer_months: 이 달에는 여름철 식(기온·습도), 나머지 달에는 겨울철 식(기온·풍속 — 기온 10℃ 이하·풍속 1.3m/s 이상일 때만, 아니면 기온 그대로)."
+    ],
+    "summer_months": [5, 6, 7, 8, 9]
+  },
+  "records": {
+    "_doc": [
+      "지역별 기록(특보가 발효된 날과 그날의 관측값): 관측 일자료 저장(teukbo/obs.py → data/obs/연-월.json)과 배포용 기록 조립(teukbo/records.py → data/records/<지역>.json).",
+      "since: 관측 일자료를 처음 받기 시작하는 날(YYYY-MM-DD). 지점마다 '저장된 마지막 날의 다음 날'부터 이어 받으므로 처음 한 번만 쓰인다.",
+      "obs_ready_hour: 전날 관측 일자료가 조회되기 시작하는 시각(한국 시각, 시). 이 시각 전에는 어제 것을 요청하지 않는다.",
+      "obs_time_budget_seconds: 한 번 실행에서 관측 자료를 받는 데 쓰는 시간 한도(초). 넘으면 받은 것만 저장하고 다음 실행이 이어 받는다.",
+      "max_station_km: 지역의 대표 지점에서 이 거리(km) 안에 관측소가 없으면 그 지역의 기록에는 관측값을 싣지 않는다.",
+      "keep_days: 지역별 기록에 싣는 최근 일수(저장소의 원자료는 지우지 않는다 — 배포 파일 크기만 줄인다)."
+    ],
+    "since": "2026-09-01",
+    "obs_ready_hour": 11,
+    "obs_time_budget_seconds": 240,
+    "max_station_km": 40,
+    "keep_days": 400
+  },
   "stale_after_hours": 4
 }

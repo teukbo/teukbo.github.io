@@ -8,25 +8,28 @@
  *  data/detail/<지역>.json  그 지역의 시간별 예보 값(모델별) — 고른 지역의 '앞으로 48시간 날씨'를 적는 데 쓴다. 없으면 그 칸을 뺀다
  *  data/backtest.json 과거 검증 — 지난 예보로 가능성을 다시 계산해 실제 특보와 맞춰 본 결과(teukbo.backtest). 없으면 그 구역을 숨긴다
  *  data/rain_longcheck.json 호우를 더 긴 기간(2년 남짓)으로 본 확인 — 실제 결과를 기상청 관측 일강수량으로 바꿔 맞춰 본 것(tools/rain_longcheck.py). 없으면 그 부분만 뺀다
- * 화면의 상태는 둘뿐이다: 지역을 고르지 않았으면 전국 지도와 전국 요약, 골랐으면 그 지역의 가능성과 그 주변 지도.
- * 원칙: 받아 온 글은 늘 텍스트로 넣는다. 공식 특보가 있으면 가능성보다 먼저 보여 준다.
+ *  data/work_rules.json  폭염·한파 때의 작업 기준(법령·고용노동부 지침을 옮긴 config/work_rules.json). 없으면 '작업 기준' 칸을 뺀다
+ *  data/records/<지역>.json  그 지역의 특보 발효 기록과 그날의 관측값 — records.js 가 읽어 달력으로 그린다
+ * 화면의 상태는 둘이다: 고른 지역(없으면 전국)과 고른 특보 종류(없으면 전체). 종류를 고르면 가능성·지도·기록이 모두 그 종류만 보여 준다.
+ * 원칙: 받아 온 글은 늘 텍스트로 넣는다. 공식 특보가 있으면 가능성보다 먼저 보여 준다. 숫자보다 '무슨 특보인지'(그림·이름)를 먼저 보여 준다.
  */
 (() => {
   "use strict";
   const { h, s, $, clear, fmtClock, fmtAgo, getJson } = window.TeukboUI;
-  const Live = window.TeukboLive, P = Live.radarProject;
+  const Live = window.TeukboLive, P = Live.radarProject, Icons = window.TeukboIcons, Records = window.TeukboRecords;
   const GRADE = { low: "낮음", caution: "주의", high: "높음", active: "발효 중", unknown: "확인 불가" };
   const RANK = { unknown: -1, low: 0, caution: 1, high: 2, active: 3 };
   const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-  const RELOAD_MS = 10 * 60 * 1000, STORE_KEY = "teukbo.region", MAX_MATCHES = 8, MAX_OTHERS = 4, MAX_NOTABLE = 4, MAX_STATIONS = 12;
+  const RELOAD_MS = 10 * 60 * 1000, STORE_KEY = "teukbo.region", TYPE_KEY = "teukbo.type", COUNT_MS = 800, MAX_MATCHES = 8, MAX_OTHERS = 4, MAX_NOTABLE = 4, MAX_STATIONS = 12;
   const MAX_OTHER_STATION_NAMES = 8, ZONE_FONT = 12, STATION_FONT = 11;
   const ZOOM_MIN_W = 5, LABEL_MAX_W = 120, ZOOM_STEP = 1.6;  // 가장 가까이 볼 때의 너비(지도 단위), 이름표·역을 적는 가장 넓은 범위, ＋/－ 한 번의 배율
   const INTRO_REVEAL_MS = 80;  // 인트로가 옅어지기 시작하고 이만큼 뒤에 본문을 그린다
   const INTRO_MIN_MS = 4200, INTRO_FADE_MS = 500;  // 여는 화면: 게이지가 차고(2.3초) 이름이 다 나온 뒤(3.2초) 1초쯤 머물도록 연 때부터 최소 이만큼은 보이고, 이만큼에 걸쳐 걷힌다(style.css 의 .intro 와 같게)
+  const FEEL_GAP = 2;  // 체감온도가 기온과 이만큼 다를 때만 '지금' 옆에 따로 적는다
   const RAIN_MODEL_MM = 1.0, RAIN_START_MM = 0.3, SNOW_MIN_CM = 1.0;  // 날씨 요약: 48시간 합계가 이만큼이면 '비 예상'으로, 3시간 합계가 이만큼 되면 '시작'으로 본다  // 지도 위 이름표의 글자 크기(px) — style.css 의 .map-label · .map-station-name 과 같게
   const NEAR_COUNT = 16, NEAR_MIN = 12, NEAR_MAX = 42;  // 고른 지역 둘레를 얼마나 넓게 보여 줄지(이웃 지역 수 기준, 지도 단위 ≈ 1.7km)
   const MIN_PROOF_CASES = 30, MIN_PROOF_DAYS = 3;  // 과거 검증 값을 가능성 옆에 적으려면: 표본 30회 이상, 특보가 있었던 날 3일 이상
-  const state = { base: null, latest: null, live: null, zones: null, proof: null, longRain: null, openFolds: new Set(), region: null, query: "", paths: new Map(), centers: new Map(), labels: new Map(), svg: null, overlay: null, wideBox: null, liveTimer: null,
+  const state = { base: null, latest: null, live: null, zones: null, proof: null, longRain: null, work: null, openFolds: new Set(), region: null, type: null, scene: null, query: "", paths: new Map(), centers: new Map(), labels: new Map(), svg: null, overlay: null, wideBox: null, liveTimer: null,
     rail: [], stations: [], stationsOf: new Map(),
     view: null,  // 지도를 직접 확대·이동했을 때의 보는 범위 [x, y, w, h]. null 이면 기본 범위(전국 또는 고른 지역 둘레)
     details: new Map() };  // `${지역 id}@${계산 시각}` → 시간별 예보(받는 중이면 "loading", 못 받았으면 null)  // stations: [{name, x, y, region}], stationsOf: 지역 id → 그 지역의 역 이름들
@@ -92,39 +95,100 @@
     if (fromMap && $("result").getBoundingClientRect().top < 0) $("result").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  // ------------------------------------------------------------ 가능성
+  // ------------------------------------------------------------ 특보 종류
 
-  /** 그 지역에서 보여 줄 특보 종류: 발효 중·예비특보이거나 가능성이 0보다 큰 것. 등급 높은 순, 같으면 % 높은 순. */
-  function rowsOf(region) {
-    return state.latest.hazards.map((hazard) => ({ hazard, sum: region.hazards[hazard.id] }))
-      .filter((x) => x.sum && (x.sum.g === "active" || x.sum.official || (x.sum.p || 0) > 0))
-      .sort((a, b) => RANK[b.sum.g] - RANK[a.sum.g] || (b.sum.p || 0) - (a.sum.p || 0));
+  const levelRank = (hazard) => ((state.latest.levels || {})[hazard.level] || {}).rank || 0;
+  const typeName = (id) => ((state.latest.types || []).find((t) => t.id === id) || {}).name || id;
+  /** 한 지역의 한 종류: 단계(주의보·경보…)별 가능성과 그 가운데 대표(등급 높은 것 → % 높은 것 → 낮은 단계). 값이 하나도 없으면 null. */
+  function typeSummary(region, typeId) {
+    const rows = state.latest.hazards.filter((hazard) => hazard.type === typeId).map((hazard) => ({ hazard, sum: region.hazards[hazard.id] })).filter((x) => x.sum)
+      .sort((a, b) => levelRank(a.hazard) - levelRank(b.hazard));
+    if (!rows.length) return null;
+    const best = [...rows].sort((a, b) => RANK[b.sum.g] - RANK[a.sum.g] || (b.sum.p || 0) - (a.sum.p || 0) || levelRank(a.hazard) - levelRank(b.hazard))[0];
+    return { type: typeId, rows, best, grade: best.sum.g, p: best.sum.p };
   }
+  /** 눈여겨볼 것인가: 발효 중·예비특보이거나 가능성이 0보다 크다 */
+  const shown = (sm) => Boolean(sm && (sm.grade === "active" || sm.best.sum.official || (sm.p || 0) > 0));
+  /** 그 지역의 종류별 요약 — 등급 높은 순, 같으면 % 높은 순 */
+  const summariesOf = (region) => (state.latest.types || []).map((t) => typeSummary(region, t.id)).filter(Boolean).sort((a, b) => RANK[b.grade] - RANK[a.grade] || (b.p || 0) - (a.p || 0));
+  /** 지도와 바탕 하늘에 쓰는 등급: 종류를 골랐으면 그 종류의 등급, 아니면 그 지역에서 가장 높은 것 */
+  function gradeOn(region) {
+    if (!region) return "low";
+    if (!state.type) return region.top ? region.top.grade : "low";
+    const sm = typeSummary(region, state.type);
+    return sm ? sm.grade : "low";
+  }
+
+  /** 특보 종류를 고른다(null 이면 전체). 고른 종류는 다음에 열 때도 기억한다. */
+  function setType(id) {
+    state.type = id && (state.latest.types || []).some((t) => t.id === id) ? id : null;
+    try { if (state.type) localStorage.setItem(TYPE_KEY, state.type); else localStorage.removeItem(TYPE_KEY); } catch (_) { /* 저장소를 못 써도 화면은 동작한다 */ }
+    render();
+  }
+
+  /** 종류 고르기: 전체 + 종류별(모두 한눈에 보이게 줄을 바꿔 늘어놓는다). 단추마다 지금 보는 범위(고른 지역, 없으면 전국에서 가장 높은 곳)의 그 종류 등급을 점으로 찍는다. */
+  function renderTypes() {
+    const box = $("types"), region = regionOf(state.region);
+    const worst = (typeId) => { let grade = "low"; for (const r of region ? [region] : state.latest.regions) { const sm = typeSummary(r, typeId); if (sm && RANK[sm.grade] > RANK[grade]) grade = sm.grade; } return grade; };
+    const chip = (id, name) => {
+      const grade = id ? worst(id) : "low";
+      return h("button", { type: "button", class: "type-chip", "aria-pressed": String((state.type || null) === id), onclick: () => setType(id) }, Icons.hazard(id || "all"), h("span", { text: name }),
+        RANK[grade] > 0 ? [h("i", { class: `type-dot g-${grade}`, "aria-hidden": "true" }), h("span", { class: "sr-only", text: ` ${GRADE[grade]}` })] : null);
+    };
+    put(clear(box), chip(null, "전체"), (state.latest.types || []).map((t) => chip(t.id, t.name)));
+  }
+
+  // ------------------------------------------------------------ 가능성
 
   const pinIcon = () => s("svg", { class: "pin", viewBox: "0 0 24 24", "aria-hidden": "true" }, s("path", { d: "M12 21.5s7-6.300 7-11.8A7 7 0 0 0 5 9.700c0 5.500 7 11.800 7 11.800Z" }), s("circle", { cx: "12", cy: "9.700", r: "2.600" }));
   const gradePill = (grade) => h("span", { class: `pill g-${grade}`, text: GRADE[grade] || GRADE.unknown });
-  const percent = (sum) => (sum.g === "active" ? "발효 중" : sum.p == null ? "–" : `${sum.p}%`);
   const topText = (top) => `${hazardName(top.hazard)} ${top.grade === "active" ? "발효 중" : `${top.p == null ? "" : `${top.p}% `}${GRADE[top.grade]}`}`;
 
+  /** 가능성 막대: 낮음·주의·높음 구간 위에 지금 값만큼 채운다. 구간의 경계는 받아 온 등급 기준(grades)에서 읽는다. */
+  function meter(p, grade, small) {
+    const g = state.latest.grades || {}, caution = Number(g.caution_min) || 30, high = Number(g.high_min) || 60, v = Math.max(0, Math.min(100, p || 0));
+    return h("span", { class: `gauge${small ? " small" : ""} g-${grade}`, style: `--v:${v}`, role: "img", "aria-label": `가능성 ${p == null ? "확인 불가" : `${p}%`} · ${GRADE[grade] || ""}` },
+      h("span", { class: "gauge-zone z-low", style: `flex-grow:${caution}` }), h("span", { class: "gauge-zone z-caution", style: `flex-grow:${high - caution}` }), h("span", { class: "gauge-zone z-high", style: `flex-grow:${100 - high}` }),
+      h("span", { class: "gauge-fill" }), small ? null : h("span", { class: "gauge-knob" }));
+  }
+
+  /** 가능성의 머리: 무슨 특보인지(그림·이름)를 먼저, 그 아래에 숫자·등급·막대·예상 시간대. */
+  function hero(sm) {
+    const { hazard, sum } = sm.best, active = sum.g === "active";
+    const when = active ? (sum.official_from ? `${rangeText(sum.official_from)} 발효` : null) : sum.from ? `${rangeText(sum.from, sum.to)} 기준 도달 예상` : null;
+    return h("div", { class: `hero g-${sum.g}` },
+      h("div", { class: "hero-head" }, h("span", { class: "hero-icon" }, Icons.hazard(sm.type, { live: true })),
+        h("p", { class: "hero-name" }, h("b", { text: hazard.name }), h("span", { text: active ? "기상청 특보" : "가능성" }))),
+      active ? h("p", { class: "hero-value word" }, h("span", { class: "hero-num", text: "발효 중" }))
+        : h("p", { class: "hero-value" }, h("span", { class: "hero-num", "data-count": sum.p == null ? null : String(sum.p), text: sum.p == null ? "–" : String(sum.p) }), sum.p != null ? h("small", null, "%") : null, gradePill(sum.g)),
+      active || sum.p == null ? null : meter(sum.p, sum.g),
+      when ? h("p", { class: "when", text: when }) : null,
+      // 호우: 주변 지역의 예보까지 보고 올린 가능성이면 그렇게 적는다(teukbo/area.py)
+      !active && sum.area != null ? h("p", { class: "basis", text: sum.near ? `주변 지역(${sum.near})의 큰비 예보까지 반영한 값입니다.` : "이 지역과 주변의 큰비 예보를 반영한 값입니다." }) : null,
+      !active && sum.p == null && hazard.note ? h("p", { class: "basis", text: hazard.note }) : null);
+  }
+
+  /** 한 줄: 그림 · 이름 · 작은 막대 · % · 등급. onpick 을 주면 누를 수 있다(그 종류만 보기). */
+  function hazardRow(typeId, hazard, sum, onpick) {
+    const active = sum.g === "active";
+    const body = [Icons.hazard(typeId), h("span", { class: "name", text: hazard.name }), active || sum.p == null ? h("span", { class: "gauge-gap" }) : meter(sum.p, sum.g, true),
+      h("b", { text: active ? "" : sum.p == null ? "–" : `${sum.p}%` }), gradePill(sum.g)];
+    return h("li", null, onpick ? h("button", { type: "button", class: "hz-row", onclick: onpick }, body) : h("div", { class: "hz-row" }, body));
+  }
+
   function renderRegion(region) {
-    const rows = rowsOf(region), top = rows[0], official = region.official || {};
-    const card = h("div", { class: `card result g-${top ? top.sum.g : "low"}` });
+    const all = summariesOf(region), official = region.official || {};
+    const lead = state.type ? typeSummary(region, state.type) : all.find(shown) || null;
+    const card = h("div", { class: `card result g-${lead ? lead.grade : "low"}` });
     card.append(h("p", { class: "where" }, pinIcon(), h("b", null, region.name), region.province ? h("small", null, region.province) : null));
 
-    if (!top) {
-      put(card, h("p", { class: "hz", text: "특보 가능성" }), h("p", { class: "headline" }, h("span", { class: "big" }, "낮음")),
-        h("p", { class: "when", text: `앞으로 ${state.latest.horizon_hours}시간, 모든 특보 종류의 가능성이 0%입니다.` }));
-    } else {
-      const sum = top.sum, active = sum.g === "active";
-      put(card, h("p", { class: "hz", text: active ? top.hazard.name : `${top.hazard.name} 가능성` }),
-        h("p", { class: "headline" }, h("span", { class: active ? "big word" : "big" }, active ? "발효 중" : sum.p == null ? "–" : String(sum.p), !active && sum.p != null ? h("small", null, "%") : null), active ? null : gradePill(sum.g)),
-        active ? (sum.official_from ? h("p", { class: "when", text: `${rangeText(sum.official_from)} 발효` }) : null)
-          : sum.from ? h("p", { class: "when", text: `${rangeText(sum.from, sum.to)} 기준 도달 예상` }) : null);
-      // 호우: 주변 지역의 예보까지 보고 올린 가능성이면 그렇게 적는다(teukbo/area.py)
-      if (!active && sum.area != null) card.append(h("p", { class: "basis", text: sum.near ? `주변 지역(${sum.near})의 큰비 예보까지 반영한 값입니다.` : "이 지역과 주변의 큰비 예보를 반영한 값입니다." }));
+    if (lead) card.append(hero(lead));
+    else {
+      put(card, h("div", { class: "hero g-low" }, h("div", { class: "hero-head" }, h("span", { class: "hero-icon" }, Icons.hazard("all", { live: true })), h("p", { class: "hero-name" }, h("b", { text: "기상특보" }), h("span", { text: "가능성" }))),
+        h("p", { class: "hero-value word" }, h("span", { class: "hero-num", text: "낮음" })),
+        h("p", { class: "when", text: `앞으로 ${state.latest.horizon_hours}시간, 모든 특보 종류의 가능성이 0%입니다.` })));
     }
-    const now = nowLine(region);
-    if (now) card.append(now);
+    card.append(h("div", { id: "nowline" }));  // 날씨 한 줄: 시간별 예보를 받으면 채운다(fillWeather)
 
     // 공식 특보·예비특보(있으면 가능성보다 이것이 우선이다)
     const lines = [];
@@ -133,35 +197,49 @@
     if (lines.length) card.append(h("ul", { class: "official-lines", "aria-label": "기상청 공식 특보" }, lines));
     else if (official.available === false) card.append(h("p", { class: "basis", text: "기상청 공식 특보는 지금 확인하지 못했습니다." }));
 
-    const others = rows.slice(1);
-    if (others.length) {
-      put(card, h("ul", { class: "others", "aria-label": "다른 특보 종류" }, others.slice(0, MAX_OTHERS).map((x) => h("li", null, h("span", { class: "name", text: x.hazard.name }), h("b", null, percent(x.sum)), x.sum.g === "active" ? null : gradePill(x.sum.g)))),
-        others.length > MAX_OTHERS ? h("p", { class: "basis", text: `외 ${others.length - MAX_OTHERS}종` }) : null);
+    if (state.type && lead) {  // 고른 종류의 다른 단계(경보 등)
+      const rest = lead.rows.filter((row) => row !== lead.best);
+      if (rest.length) card.append(h("ul", { class: "others", "aria-label": `${typeName(state.type)}의 다른 단계` }, rest.map((row) => hazardRow(lead.type, row.hazard, row.sum))));
+    } else if (!state.type) {  // 다른 종류 — 누르면 그 종류만 본다
+      const rest = all.filter((sm) => shown(sm) && sm !== lead);
+      if (rest.length) {
+        put(card, h("ul", { class: "others", "aria-label": "다른 특보 종류" }, rest.slice(0, MAX_OTHERS).map((sm) => hazardRow(sm.type, sm.best.hazard, sm.best.sum, () => setType(sm.type)))),
+          rest.length > MAX_OTHERS ? h("p", { class: "basis", text: `외 ${rest.length - MAX_OTHERS}종` }) : null);
+      }
     }
     const models = (region.models || []).length;
-    const evidence = top && top.sum.g !== "active" ? proofLine(top.hazard, top.sum.p) : null;
+    const evidence = lead && lead.grade !== "active" ? proofLine(lead.best.hazard, lead.p) : null;
     if (evidence) card.append(h("p", { class: "evidence", text: evidence }));
     card.append(h("p", { class: "basis", text: `앞으로 ${state.latest.horizon_hours}시간${models ? ` · 예보 ${models}개 비교` : ""} · 참고값` }));
     const here = state.stationsOf.get(region.id) || [];
     if (here.length) card.append(h("p", { class: "stations-line" }, h("span", { class: "map-station key", "aria-hidden": "true" }), `이 지역의 역: ${here.slice(0, MAX_STATIONS).join(", ")}${here.length > MAX_STATIONS ? ` 외 ${here.length - MAX_STATIONS}곳` : ""}`));
-    return [card, renderWeather(region)];
+    return [card, h("div", { id: "work" }), h("div", { id: "weather" })];  // 작업 기준·날씨 칸도 시간별 예보를 받으면 채운다
   }
 
-  /** 지역을 고르지 않았을 때: 전국에서 지금 눈여겨볼 곳 */
+  /** 지역을 고르지 않았을 때: 전국에서 지금 눈여겨볼 곳(종류를 골랐으면 그 종류만) */
   function renderNation() {
-    const regions = state.latest.regions, count = { active: 0, high: 0, caution: 0 };
-    for (const r of regions) if (r.top && count[r.top.grade] != null) count[r.top.grade] += 1;
-    const worst = count.active ? "active" : count.high ? "high" : count.caution ? "caution" : "low";
+    const regions = state.latest.regions, types = state.latest.types || [];
+    const tallyOf = (typeId) => { const c = { active: 0, high: 0, caution: 0 }; for (const r of regions) { const g = typeId ? (typeSummary(r, typeId) || {}).grade : r.top && r.top.grade; if (c[g] != null) c[g] += 1; } return c; };
+    const count = tallyOf(state.type), worst = count.active ? "active" : count.high ? "high" : count.caution ? "caution" : "low";
+    const parts = [["active", "발효 중"], ["high", "높음"], ["caution", "주의"]];
+    const tallyText = (c) => parts.filter(([grade]) => c[grade]).map(([grade, label]) => `${label} ${c[grade]}`).join(" · ");
     const card = h("div", { class: `card result nation g-${worst}` });
     card.append(h("p", { class: "where" }, pinIcon(), h("b", null, "전국"), h("small", null, `${regions.length}개 지역`)));
-    const parts = [["active", "발효 중"], ["high", "높음"], ["caution", "주의"]].filter(([grade]) => count[grade]);
-    if (!parts.length) {
-      put(card, h("p", { class: "hz", text: "특보 가능성" }), h("p", { class: "headline" }, h("span", { class: "big" }, "낮음")), h("p", { class: "when", text: `앞으로 ${state.latest.horizon_hours}시간, 전국 모든 지역의 특보 가능성이 낮습니다.` }));
+    const head = h("div", { class: "hero-head" }, h("span", { class: "hero-icon" }, Icons.hazard(state.type || "all", { live: true })),
+      h("p", { class: "hero-name" }, h("b", { text: state.type ? `${typeName(state.type)} 특보` : "기상특보" }), h("span", { text: "가능성이 있는 지역" })));
+    if (worst === "low") {
+      put(card, h("div", { class: "hero g-low" }, head, h("p", { class: "hero-value word" }, h("span", { class: "hero-num", text: "없음" })),
+        h("p", { class: "when", text: `앞으로 ${state.latest.horizon_hours}시간, 전국 모든 지역의 ${state.type ? `${typeName(state.type)} 특보 ` : "특보 "}가능성이 낮습니다.` })));
     } else {
-      put(card, h("p", { class: "hz", text: "특보 가능성이 있는 지역" }), h("p", { class: "tally" }, parts.map(([grade, label]) => h("span", null, gradePill(grade), h("b", null, ` ${count[grade]}`), "곳"))));
-      const notable = regions.filter((r) => r.top && RANK[r.top.grade] >= RANK.caution).sort((a, b) => RANK[b.top.grade] - RANK[a.top.grade] || (b.top.p || 0) - (a.top.p || 0));
-      put(card, h("ul", { class: "others notable", "aria-label": "눈여겨볼 지역" }, notable.slice(0, MAX_NOTABLE).map((r) => h("li", null,
-        h("button", { class: "linklike name", type: "button", onclick: () => pick(r.id) }, fullName(r)), h("b", null, r.top.grade === "active" ? "" : r.top.p == null ? "" : `${r.top.p}%`), h("span", { class: "hz-small", text: `${hazardName(r.top.hazard)}${r.top.grade === "active" ? " 발효 중" : ""}` })))),
+      put(card, h("div", { class: `hero g-${worst}` }, head, h("p", { class: "tally" }, parts.filter(([grade]) => count[grade]).map(([grade, label]) => h("span", null, gradePill(grade), h("b", { "data-count": String(count[grade]), text: ` ${count[grade]}` }), "곳")))));
+      if (!state.type) {  // 종류별로 몇 곳인지 — 누르면 그 종류만 본다
+        const byType = types.map((t) => ({ t, c: tallyOf(t.id) })).filter((x) => x.c.active + x.c.high + x.c.caution > 0).sort((a, b) => b.c.active - a.c.active || b.c.high - a.c.high || b.c.caution - a.c.caution);
+        card.append(h("ul", { class: "others by-type", "aria-label": "특보 종류별" }, byType.map(({ t, c }) => h("li", null, h("button", { type: "button", class: "hz-row", onclick: () => setType(t.id) }, Icons.hazard(t.id), h("span", { class: "name", text: t.name }), h("span", { class: "counts", text: tallyText(c) }))))));
+      }
+      const leadOf = (r) => { if (state.type) return typeSummary(r, state.type); const hz = r.top && state.latest.hazards.find((x) => x.id === r.top.hazard); return hz ? typeSummary(r, hz.type) : null; };
+      const notable = regions.map((r) => ({ r, sm: leadOf(r) })).filter((x) => x.sm && RANK[x.sm.grade] >= RANK.caution).sort((a, b) => RANK[b.sm.grade] - RANK[a.sm.grade] || (b.sm.p || 0) - (a.sm.p || 0));
+      put(card, h("ul", { class: "others notable", "aria-label": "눈여겨볼 지역" }, notable.slice(0, MAX_NOTABLE).map(({ r, sm }) => h("li", null, h("button", { type: "button", class: "hz-row", onclick: () => pick(r.id) },
+        Icons.hazard(sm.type), h("span", { class: "name" }, fullName(r), h("small", { text: sm.best.hazard.name })), h("b", { text: sm.grade === "active" || sm.p == null ? "" : `${sm.p}%` }), gradePill(sm.grade))))),
         notable.length > MAX_NOTABLE ? h("p", { class: "basis", text: `외 ${notable.length - MAX_NOTABLE}곳 — 지도에서 색이 칠해진 곳입니다` }) : null);
     }
     card.append(h("p", { class: "basis", text: "지역 이름을 입력하거나 지도에서 눌러 보세요." }));
@@ -169,9 +247,24 @@
   }
 
   function renderResult() {
-    const region = regionOf(state.region);
-    put(clear($("result")), region ? renderRegion(region) : renderNation());
+    const region = regionOf(state.region), box = clear($("result"));
+    put(box, region ? renderRegion(region) : renderNation());
+    if (state.fresh) box.firstChild.classList.add("enter");
+    if (region) fillWeather(region, state.fresh);
     paintSky();
+    if (state.fresh) countUp(box);
+  }
+
+  /** 숫자가 0에서 올라오게(지역이나 종류를 바꾼 첫 그림에서만). 움직임 줄이기 설정이면 바로 적는다. */
+  function countUp(root) {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    for (const node of root.querySelectorAll("[data-count]")) {
+      const end = Number(node.dataset.count), lead = node.textContent.startsWith(" ") ? " " : "", t0 = performance.now();
+      if (!(end > 0)) continue;
+      const step = (now) => { if (!node.isConnected) return; const k = Math.min(1, (now - t0) / COUNT_MS); node.textContent = `${lead}${Math.round(end * (1 - (1 - k) ** 3))}`; if (k < 1) requestAnimationFrame(step); };
+      node.textContent = `${lead}0`;
+      requestAnimationFrame(step);
+    }
   }
 
 
@@ -184,7 +277,7 @@
     state.details.set(key, "loading");
     getJson(`data/detail/${encodeURIComponent(region.id)}.json`).then((doc) => doc, () => null).then((doc) => {
       state.details.set(key, doc && Array.isArray(doc.times) && doc.series ? doc : null);
-      if (state.region === region.id) renderResult();
+      if (state.region === region.id) { fillWeather(region, true); paintSky(); }  // 가능성의 머리는 그대로 두고 날씨에 기대는 칸만 채운다
     });
     return "loading";
   }
@@ -206,7 +299,7 @@
     const ahead = (Date.now() - new Date(times[0]).getTime()) / 3600000;  // 자료의 첫 시각에서 지금까지 흐른 시간
     const at = Math.max(0, Math.min(n - 1, Math.round(ahead)));  // 지금에 가장 가까운 시각
     const from = Math.max(1, at);  // 요약에 넣는 첫 시각
-    const out = { blocks: [], rain: null, snow: null, tempMin: null, tempMax: null, wind: null, gust: null, now: null, until: times[n - 1] };
+    const out = { blocks: [], rain: null, snow: null, tempMin: null, tempMax: null, wind: null, gust: null, now: null, until: times[n - 1], times, from, feel: null, feelMin: null, feelMax: null, feelNow: null };
     if (ahead >= n - 1) return out;
     const models = (key) => Object.values(series[key] || {}).filter((row) => Array.isArray(row) && row.some((v, i) => i >= from && v != null));
     const mid = (key) => { const rows = models(key); return rows.length ? times.map((_, i) => median(rows.map((row) => row[i]))) : null; };
@@ -231,6 +324,9 @@
       out.blocks.forEach((blk) => { blk.temp = temp[blk.at]; });  // 그 시간대가 시작할 때의 기온
       if (temp[at] != null) out.now = { v: temp[at], t: times[at] };
     }
+    // 체감온도(기상청 식: 여름철은 기온·습도, 겨울철은 기온·바람 — teukbo/indicators.py 가 계산해 싣는다). 없으면 그 줄을 뺀다
+    const feel = mid("v:feel");
+    if (feel) { out.feel = feel; out.feelMin = peak(feel, -1); out.feelMax = peak(feel, 1); if (feel[at] != null) out.feelNow = feel[at]; }
     return out;
   }
 
@@ -250,7 +346,7 @@
     const doc = detailOf(region);
     if (!doc || doc === "loading") return null;
     const w = weatherOf(doc), parts = [];
-    if (w.now) parts.push(`지금 ${Math.round(w.now.v)}°`);
+    if (w.now) parts.push(`지금 ${Math.round(w.now.v)}°${w.feelNow != null && Math.abs(w.feelNow - w.now.v) >= FEEL_GAP ? ` (체감 ${Math.round(w.feelNow)}°)` : ""}`);
     if (w.tempMin && w.tempMax) parts.push(`최고 ${Math.round(w.tempMax.v)}° / 최저 ${Math.round(w.tempMin.v)}°`);
     if (!parts.length && !w.rain) return null;
     return h("div", { class: "nowline" }, parts.length ? h("p", { text: parts.join(" · ") }) : null,
@@ -291,17 +387,90 @@
     const doc = detailOf(region);
     if (!doc) return null;
     const box = h("section", { class: "glass weather", "aria-label": "날씨" });
-    if (doc === "loading") return put(box, h("p", { class: "glass-title" }, "날씨"), h("p", { class: "basis", text: "불러오는 중…" }));
+    if (doc === "loading") return put(box, h("p", { class: "glass-title" }, "날씨"), h("div", { class: "skeleton", role: "status", "aria-label": "날씨를 불러오는 중" }, h("span"), h("span"), h("span")));
     const w = weatherOf(doc), lines = [];
     box.append(h("p", { class: "glass-title" }, "날씨", h("small", null, ` 지금부터 ${whenText(w.until)}까지 · 예보들의 중간값`)));
     if (w.rain) lines.push(h("li", null, h("span", { class: "name", text: "비" }), h("b", { text: rainText(w, true) }), w.rain.wet ? h("small", null, `예보 ${w.rain.models}개 중 ${w.rain.wet}개가 비 예상`) : null));
     if (w.snow && w.snow.wet) lines.push(h("li", null, h("span", { class: "name", text: "눈" }), h("b", { text: `최대 ${mm(w.snow.max)}cm` }), h("small", null, `예보 ${w.snow.models}개 중 ${w.snow.wet}개가 눈 예상(24시간 신적설)`)));
     if (w.tempMin && w.tempMax) lines.push(h("li", null, h("span", { class: "name", text: "기온" }), h("b", { text: `${Math.round(w.tempMin.v)}~${Math.round(w.tempMax.v)}℃` }), h("small", null, `최저 ${whenText(w.tempMin.t)} · 최고 ${whenText(w.tempMax.t)}`)));
+    if (w.feelMin && w.feelMax) lines.push(h("li", null, h("span", { class: "name", text: "체감" }), h("b", { text: `${Math.round(w.feelMin.v)}~${Math.round(w.feelMax.v)}℃` }), h("small", null, `가장 낮을 때 ${whenText(w.feelMin.t)} · 가장 높을 때 ${whenText(w.feelMax.t)}`)));
     if (w.wind) lines.push(h("li", null, h("span", { class: "name", text: "바람" }), h("b", { text: `최대 ${Math.round(w.wind.v)}m/s` }), h("small", null, `${whenText(w.wind.t)}${w.gust ? ` · 순간 ${Math.round(w.gust.v)}m/s` : ""}`)));
     if (!lines.length) return null;
     if (w.blocks.length) box.append(hourStrip(w));
     box.append(h("ul", { class: "weather-lines" }, lines));
     return box;
+  }
+
+  // ------------------------------------------------------------ 작업 기준(폭염·한파)
+
+  /** 연속한 시각들을 '내일 12시~17시' 꼴로 묶는다(많으면 앞의 둘만 적고 '외'). */
+  function hourRanges(times, picked) {
+    const runs = [];
+    for (const i of picked) { const last = runs[runs.length - 1]; if (last && i === last[1] + 1) last[1] = i; else runs.push([i, i]); }
+    const text = ([a, b]) => { const from = whenText(times[a]), to = whenText(times[b]); return a === b ? from : from.split(" ")[0] === to.split(" ")[0] ? `${from}~${to.split(" ")[1]}` : `${from}~${to}`; };
+    return runs.slice(0, 2).map(text).join(", ") + (runs.length > 2 ? " 외" : "");
+  }
+
+  /** 폭염·한파 때의 작업 기준. 기준(단계·문구·출처)은 모두 받아 온 자료(work_rules.json)에서 읽는다 — 화면 코드에 수치를 적지 않는다.
+   *  단계는 두 가지 꼴이다: 체감온도가 얼마 이상/이하(min·max)이면 해당하는 것, 특보 단계(level)가 발효·예상되면 해당하는 것.
+   *  한파·폭염을 골랐으면 그 기준을 펼쳐서, 전체를 볼 때는 제철인 기준만 접어서 보여 준다. */
+  function renderWork(region) {
+    const rules = state.work, doc = detailOf(region);
+    if (!rules || !Array.isArray(rules.guides)) return null;
+    const month = new Date(Date.now() + 9 * 3600 * 1000).getUTCMonth() + 1;
+    const guide = state.type ? rules.guides.find((g) => g.type === state.type) : rules.guides.find((g) => (g.months || []).includes(month));
+    if (!guide) return null;
+    const w = doc && doc !== "loading" ? weatherOf(doc) : null, metric = guide.metric || {}, unit = metric.unit || "℃";
+    const extreme = w ? (metric.stat === "min" ? w.feelMin : w.feelMax) : null, sm = typeSummary(region, guide.type);
+    const kindName = (kind) => (rules.kinds || {})[kind] || kind || "";
+    let reached = null;  // 지금 예보로 해당하는 가장 높은 단계
+    const stages = (guide.stages || []).map((stage) => {
+      let state_ = "", note = "";
+      if (stage.level) {
+        const row = sm && sm.rows.find((x) => x.hazard.level === stage.level), sum = row && row.sum;
+        if (sum && sum.g === "active") { state_ = "on"; note = "발효 중"; }
+        else if (sum && sum.official) { state_ = "on"; note = "예비특보"; }
+        else if (sum && RANK[sum.g] >= RANK.caution) { state_ = "near"; note = `가능성 ${sum.p == null ? "" : `${sum.p}% `}${GRADE[sum.g]}`; }
+        else if (sum && sum.p != null) note = `가능성 ${sum.p}%`;
+      } else if (w && w.feel) {
+        const hit = [];
+        w.feel.forEach((v, i) => { if (i >= w.from && v != null && ((stage.min != null && v >= stage.min) || (stage.max != null && v <= stage.max))) hit.push(i); });
+        if (hit.length) { state_ = "on"; note = `해당 예상 · ${hourRanges(w.times, hit)}`; }
+      }
+      if (state_ === "on") reached = stage;
+      const label = stage.level ? stage.name : `${metric.label || "체감온도"} ${stage.min != null ? `${stage.min}${unit} 이상` : `${stage.max}${unit} 이하`}`;
+      return h("li", { class: `stage${state_ ? ` ${state_}` : ""}` },
+        h("p", { class: "stage-key" }, h("b", { text: label }), stage.kind ? h("span", { class: `kind k-${stage.kind}`, text: kindName(stage.kind) }) : null, note ? h("span", { class: "stage-note", text: note }) : null),
+        h("p", { class: "stage-text" }, stage.level || !stage.name ? null : h("b", { text: `${stage.name} ` }), stage.text));
+    });
+    const stageLabel = (stage) => (stage.level ? stage.name : `${metric.label || "체감온도"} ${stage.min != null ? `${stage.min}${unit} 이상` : `${stage.max}${unit} 이하`}${stage.name ? ` ${stage.name}` : ""}`);
+    const temp = w ? (metric.stat === "min" ? w.tempMin : w.tempMax) : null;
+    const status = extreme ? `${metric.stat === "min" ? "가장 낮은" : "가장 높은"} ${metric.label || "체감온도"} ${Math.round(extreme.v)}${unit} · ${whenText(extreme.t)}` : doc === "loading" ? "예보를 불러오는 중…" : "";
+    const body = [
+      status ? h("p", { class: "work-status" }, Icons.hazard(guide.type, { live: true }), h("span", null, h("b", { text: status }),
+        h("small", null, `${temp ? `기온은 ${metric.stat === "min" ? "최저" : "최고"} ${Math.round(temp.v)}${unit} · ` : ""}${reached ? `‘${stageLabel(reached)}’ 단계에 해당` : "지금 예보로는 해당하는 단계가 없습니다"}`))) : null,
+      h("ol", { class: "stages" }, stages),
+      (guide.basics || []).length ? h("p", { class: "work-basics" }, h("b", { text: `${guide.basics_title || "기본 수칙"} ` }), guide.basics.join(" · ")) : null,
+      // 긴 설명(유의할 점·단계별 근거·출처)은 접어 둔다
+      fold(`work-more-${guide.id}`, "근거와 유의할 점",
+        guide.note ? h("p", { class: "work-basics", text: guide.note }) : null,
+        h("ul", { class: "fold-notes" }, (guide.stages || []).filter((stage) => stage.basis).map((stage) => h("li", null, h("b", { text: `${stageLabel(stage)}(${kindName(stage.kind)}) ` }), stage.basis))),
+        h("p", { class: "work-source" }, rules.notice ? `${rules.notice} ` : null, (guide.sources || []).map((src, k) => [k ? " · " : "출처: ", src.url ? h("a", { href: src.url, rel: "noopener", text: src.name }) : src.name]), rules.checked_at ? ` (${rules.checked_at} 확인)` : null))];
+    const box = h("section", { class: "glass work", "aria-label": guide.title });
+    if (state.type) return put(box, h("p", { class: "glass-title" }, guide.title, guide.subtitle ? h("small", null, ` ${guide.subtitle}`) : null), body);
+    // 접어 둔 채로도 지금 어느 단계인지는 제목에서 보이게
+    return put(box, fold(`work-${guide.id}`, `${guide.title}${w ? ` — ${reached ? `${stageLabel(reached)} 단계` : "해당 단계 없음"}` : ""}`, body));
+  }
+
+  /** 시간별 예보에 기대는 칸(날씨 한 줄 · 작업 기준 · 날씨)을 채운다. 가능성의 머리는 건드리지 않는다. animate: 새로 나타나게. */
+  function fillWeather(region, animate) {
+    const slots = [["nowline", nowLine(region)], ["work", renderWork(region)], ["weather", renderWeather(region)]];
+    for (const [id, node] of slots) {
+      const slot = $(id);
+      if (!slot) continue;
+      clear(slot);
+      if (node) { if (animate) node.classList.add("pop"); slot.append(node); }
+    }
   }
 
   /** 바탕 하늘: 낮·밤(한국 시각), 지금 비가 오는 시간대면 비 하늘. 가능성이 '주의' 이상이면 위쪽에 그 색을 얹는다. */
@@ -311,8 +480,8 @@
     const doc = region ? state.details.get(`${region.id}@${state.base.generated_at}`) : null;
     if (doc && doc !== "loading") { const first = weatherOf(doc).blocks[0]; if (first && (first.mm || 0) >= 0.5) sky = "rain"; }
     let grade = "low";
-    if (region) grade = region.top ? region.top.grade : "low";
-    else for (const r of state.latest.regions) if (r.top && RANK[r.top.grade] > RANK[grade]) grade = r.top.grade;
+    if (region) grade = gradeOn(region);
+    else for (const r of state.latest.regions) { const g = gradeOn(r); if (RANK[g] > RANK[grade]) grade = g; }
     document.body.dataset.sky = sky;
     document.body.dataset.grade = RANK[grade] > 0 ? grade : "low";
     const meta = document.querySelector('meta[name="theme-color"]:not([media])');
@@ -667,8 +836,9 @@
     if (!state.svg) return;
     const picked = state.centers.has(state.region) ? state.region : null;
     for (const [id, paths] of state.paths) {
-      const region = regionOf(id), top = region && region.top, grade = top ? top.grade : "low", isPicked = id === picked;
-      const label = region ? `${fullName(region)}: ${top && RANK[top.grade] > 0 ? topText(top) : "가능성 낮음"}` : id;
+      const region = regionOf(id), top = region && region.top, grade = gradeOn(region), isPicked = id === picked;
+      const sm = region && state.type ? typeSummary(region, state.type) : null;
+      const label = !region ? id : `${fullName(region)}: ${state.type ? (sm && RANK[sm.grade] > 0 ? topText({ hazard: sm.best.hazard.id, grade: sm.grade, p: sm.p }) : `${typeName(state.type)} 가능성 낮음`) : top && RANK[top.grade] > 0 ? topText(top) : "가능성 낮음"}`;
       for (const path of paths) {
         path.setAttribute("class", `zone g-${grade}${isPicked ? " picked" : ""}`);
         path.setAttribute("aria-label", label);
@@ -676,7 +846,17 @@
         if (isPicked && path.parentNode.lastChild !== path) path.parentNode.append(path);  // 고른 지역의 테두리가 이웃에 가리지 않게 맨 위로
       }
     }
+    $("map-what").textContent = `색: ${state.type ? `${typeName(state.type)} 특보` : "가장 높은 특보"} 가능성`;
     applyView();
+  }
+
+  // ------------------------------------------------------------ 기록
+
+  /** 특보 기록(달력): 고른 지역과 종류를 넘겨 records.js 가 그린다. */
+  function renderRecords(fresh) {
+    const region = regionOf(state.region);
+    $("records-title").textContent = `특보 기록${state.type ? ` · ${typeName(state.type)}` : ""}${region ? ` · ${region.name}` : ""}`;
+    Records.render($("records-body"), { region: region ? { id: region.id, name: region.name } : null, type: state.type, types: state.latest.types, levels: state.latest.levels, again: () => renderRecords(false), fresh, fold });
   }
 
   // ------------------------------------------------------------ 머리말 · 전체
@@ -694,7 +874,12 @@
   function render() {
     if (!state.latest) return;
     if (!regionOf(state.region)) state.region = null;
-    renderHead(); renderMatches(); renderResult(); paintMap(); renderProof();
+    // 지역이나 종류가 바뀐 첫 그림에서만 움직인다(몇 분마다 다시 그릴 때는 가만히)
+    const scene = `${state.region || ""}|${state.type || ""}`;
+    state.fresh = scene !== state.scene;
+    state.scene = scene;
+    renderHead(); renderMatches(); renderTypes(); renderResult(); paintMap(); renderRecords(state.fresh); renderProof();
+    state.fresh = false;
   }
 
   function applyLive() {
@@ -711,9 +896,10 @@
 
   async function load() {
     try {
-      const [latest, zones, proof, rail, stations, longRain] = await Promise.all([getJson("data/latest.json"), state.zones || getJson("geo/zones.json"), getJson("data/backtest.json").catch(() => null),
+      const [latest, zones, proof, rail, stations, longRain, work] = await Promise.all([getJson("data/latest.json"), state.zones || getJson("geo/zones.json"), getJson("data/backtest.json").catch(() => null),
         state.rail.length ? state.rail : getJson("geo/rail.json").catch(() => []), state.stationList || getJson("geo/stations.json").catch(() => []),
-        state.longRain || getJson("data/rain_longcheck.json").catch(() => null)]);
+        state.longRain || getJson("data/rain_longcheck.json").catch(() => null), state.work || getJson("data/work_rules.json").catch(() => null)]);
+      state.work = work || state.work;
       state.proof = proof || state.proof;
       state.longRain = longRain || state.longRain;
       state.rail = Array.isArray(rail) ? rail : []; state.stationList = Array.isArray(stations) ? stations : [];
@@ -721,7 +907,8 @@
       state.base = latest; state.zones = zones;
       state.latest = Live.applyToLatest(latest, state.live, (latest.live || {}).stale_after_minutes || 30);
       if (first) {
-        try { state.region = localStorage.getItem(STORE_KEY); } catch (_) { /* 무시 */ }
+        try { state.region = localStorage.getItem(STORE_KEY); state.type = localStorage.getItem(TYPE_KEY); } catch (_) { /* 무시 */ }
+        if (!(latest.types || []).some((item) => item.id === state.type)) state.type = null;
         drawMap();
       }
       render();
@@ -750,7 +937,7 @@
       intro.classList.add("is-leaving");
       // 본문은 인트로가 옅어지기 시작한 바로 뒤에 처음 그린다(그 전에는 html.intro-on 으로 가려 둔다):
       // 인트로에 완전히 가려진 채 그려지고 밀린 지도가 덜 그려진 채 남는 일을 막는다.
-      setTimeout(() => { document.documentElement.classList.remove("intro-on"); layoutOverlay(); }, INTRO_REVEAL_MS);
+      setTimeout(() => { document.documentElement.classList.remove("intro-on"); state.scene = null; render(); layoutOverlay(); }, INTRO_REVEAL_MS);
       setTimeout(() => { intro.remove(); repaintMap(); }, INTRO_FADE_MS + 100);
     }, wait);
   }

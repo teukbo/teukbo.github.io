@@ -721,7 +721,7 @@ class RailPageTest(unittest.TestCase):
         self.assertNotIn("gis.korail.com", (self.WEB / "live.js").read_text(encoding="utf-8"))
 
     def test_first_screen_is_only_search_probability_and_map(self):
-        """첫 화면은 지역 찾기 → 그 지역의 가능성 → 지도, 이것만. 다른 화면으로 가는 메뉴를 두지 않는다."""
+        """첫 화면은 지역 찾기 → (특보 종류 고르기) → 그 지역의 가능성 → 지도 → 특보 기록 → 과거 검증. 다른 화면으로 가는 메뉴를 두지 않는다."""
         import re
 
         html = (self.WEB / "index.html").read_text(encoding="utf-8")
@@ -730,12 +730,13 @@ class RailPageTest(unittest.TestCase):
         self.assertNotIn('<nav', html)
         for other in ("full.html", "rail.html", "analysis.html"):
             self.assertNotIn(other, html, other)
-        self.assertEqual(re.findall(r'<h2 id="([\w-]+)"', html), ["h-proof"])  # 구역 제목은 맨 아래 '과거 검증' 하나뿐
+        self.assertEqual(re.findall(r'<h2 id="([\w-]+)"', html), ["h-records", "h-proof"])  # 구역 제목은 지도 아래의 '특보 기록'과 맨 아래 '과거 검증' 둘뿐
         self.assertIn("data/backtest.json", script)
         body = html[html.index("<main"):html.index("</main>")]
         self.assertLess(body.index('id="q"'), body.index('id="result"'))  # 찾기 → 가능성 → 지도
         self.assertLess(body.index('id="result"'), body.index('id="map"'))
-        self.assertLess(body.index('id="map"'), body.index('id="proof"'))  # 과거 검증은 지도 아래에
+        self.assertLess(body.index('id="map"'), body.index('id="records"'))  # 특보 기록은 지도 아래에
+        self.assertLess(body.index('id="records"'), body.index('id="proof"'))  # 과거 검증은 맨 아래에
         for name in set(re.findall(r'\$\("([\w-]+)"\)', script)):
             self.assertIn(f'id="{name}"', html, name)
         self.assertNotIn("innerHTML", script)  # 받아 온 글은 늘 텍스트로 넣는다
