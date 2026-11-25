@@ -182,6 +182,11 @@ class MotionTest(unittest.TestCase):
         self.assertIn('window.matchMedia("(prefers-reduced-motion: reduce)").matches', script)  # 숫자 올리기도 설정을 따른다
         fill = script[script.index("function fillWeather(region, animate)"):script.index("/** 바탕 하늘")]
         self.assertNotIn("renderResult", fill)  # 날씨가 늦게 와도 가능성의 머리는 다시 그리지 않는다
+        # 인트로가 걷힐 때 첫 그림의 움직임을 한 번 보여 주되, 인트로를 건너뛴 때(같은 탭에서 다시 연 때)는 다시 움직이지 않는다
+        # — 건너뛴 채로도 몇 초 뒤에 화면이 한 번 더 떠오르던 문제(2026-11-25).
+        intro = script[script.index("function closeIntro(now)"):script.index("function repaintMap()")]
+        skip, replay = intro.index('classList.contains("no-intro")) { intro.remove(); return; }'), intro.index("state.scene = null; render();")
+        self.assertLess(skip, replay)
 
 
 if __name__ == "__main__":
