@@ -79,6 +79,15 @@ jobs:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
         run: python3 -m teukbo.rail_run
 
+      - name: 관측 일자료 이어 받기 (기상청 ASOS — 지역별 기록의 '그날의 날씨')
+        if: ${{ steps.due.outputs.run == 'true' }}
+        # 관측 자료를 못 받아도 기상 수집·배포는 계속한다. 전날 것은 오전 11시 뒤에 올라오므로, 받을 날이 없는 회차에는 한 번도 호출하지 않는다.
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+        run: python3 -m teukbo.obs
+
       - name: 이력 커밋
         if: ${{ steps.due.outputs.run == 'true' }}
         run: |
@@ -86,6 +95,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/history data/accuracy.json
           if [ -d data/rail ]; then git add data/rail; fi
+          if [ -d data/obs ]; then git add data/obs; fi
           if git diff --cached --quiet; then
             echo "커밋할 변경이 없습니다."
             exit 0

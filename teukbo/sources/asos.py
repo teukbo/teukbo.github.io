@@ -14,6 +14,7 @@
 일자료 한 행(하루)에서 쓰는 값 — 활용가이드(2019-12-20 판)의 항목 이름
     tm 날짜(YYYY-MM-DD) · sumRn 일강수량(mm) · hr1MaxRn 1시간 최다강수량(mm) · maxWs 최대 풍속(m/s) · maxInsWs 최대 순간풍속(m/s)
     minTa·maxTa 최저·최고 기온(℃) · avgRhm 평균 습도(%) · ddMefs 일 최심신적설(cm)
+    minRhm 최소 습도(%) · avgWs 평균 풍속(m/s) — 지역별 기록(teukbo/records.py)의 체감온도 추정에 쓴다
     전날 자료는 오전 11시 뒤에 조회된다. 강수량·신적설의 빈 값은 '없음'으로 본다.
 """
 
@@ -31,7 +32,8 @@ PAGE_SIZE = 999  # 한 번에 받을 수 있는 최대 행 수
 FIELDS = {"ta": "temp", "rn": "precip", "ws": "wind", "hm": "rh", "hr3Fhsc": "snow3h", "dsnw": "snow_depth"}
 DAILY_ENDPOINT = "https://apis.data.go.kr/1360000/AsosDalyInfoService/getWthrDataList"
 DAILY_FIELDS = {"sumRn": "rain", "hr1MaxRn": "rain_1h_max", "maxWs": "wind_max", "maxInsWs": "gust_max",
-                "minTa": "temp_min", "maxTa": "temp_max", "avgRhm": "rh_avg", "ddMefs": "snow_new"}
+                "minTa": "temp_min", "maxTa": "temp_max", "avgRhm": "rh_avg", "ddMefs": "snow_new",
+                "minRhm": "rh_min", "avgWs": "wind_avg"}
 
 
 def _number(value: Any) -> float | None:
@@ -83,7 +85,7 @@ def fetch_hourly(key: str, station: str, start: datetime, end: datetime, http_op
 
 
 def parse_daily_rows(items: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """일자료 응답 행들 → [{d: 날짜, stn, name, rain, rain_1h_max, wind_max, gust_max, temp_min, temp_max, rh_avg, snow_new}] (값이 없으면 None)."""
+    """일자료 응답 행들 → [{d: 날짜, stn, name, rain, rain_1h_max, wind_max, gust_max, temp_min, temp_max, rh_avg, snow_new, rh_min, wind_avg}] (값이 없으면 None)."""
     out = []
     for row in items:
         try:

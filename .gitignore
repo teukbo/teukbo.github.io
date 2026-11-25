@@ -16,3 +16,7 @@ __pycache__/
 .venv/
 node_modules/
 .DS_Store
+
+# 지역별 기록·작업 기준(사이트를 조립할 때 _site 에만 만든다)
+/data/records/
+/data/work_rules.json

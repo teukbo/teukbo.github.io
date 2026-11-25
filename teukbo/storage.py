@@ -16,11 +16,12 @@ from typing import Any
 
 from .assess import HazardAssessment, OfficialWarning, RegionAssessment, RegionOfficial
 from .config import Config
-from .indicators import HOUR, ModelSeries, indicator_points
+from .indicators import HOUR, ModelSeries, add_feel_temp, indicator_points
 from .timeutil import floor_hour, iso
 
 SCHEMA = 1
 NOTICE = "참고용입니다. 공식 특보·예비특보가 우선합니다."
+FEEL_KEY = "v:feel"  # detail 의 series 키: 시간별 체감온도(5~9월 여름철 식, 그 밖의 달 겨울철 식 — settings.json 의 feel.summer_months)
 
 
 def write_json(path: Path, data: Any, *, pretty: bool = False) -> None:
@@ -198,7 +199,10 @@ def build_detail(ra: RegionAssessment, series: dict[str, ModelSeries], cfg: Conf
     times = [start + k * HOUR for k in range(st.horizon_hours + 1)]
 
     used = sorted({leaf.indicator for hz in th.hazards for leaf in hz.leaves()})
-    chart_keys = sorted({k for k in (_chart_key(cfg, key) for key in used) if k})
+    # v:feel(철에 맞는 체감온도)은 특보 기준에는 쓰이지 않지만 화면의 날씨·작업 기준 칸이 읽으므로 늘 싣는다
+    chart_keys = sorted({k for k in (_chart_key(cfg, key) for key in used) if k} | {FEEL_KEY})
+    for mid in ra.models_used:
+        add_feel_temp(series[mid], st.feel_summer_months)
     chart_series: dict[str, dict[str, list[float | None]]] = {}
     for ck in chart_keys:
         kind, name = ck.split(":", 1)
