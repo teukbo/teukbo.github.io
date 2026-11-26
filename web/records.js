@@ -150,8 +150,8 @@ window.TeukboRecords = (() => {
       h("span", { class: "hr-hour", text: `${pad(hour)}시` }),
       h("span", { class: "hr-wet", text: r && isWet(r) ? `${wetName(r.pty)}${r.rain ? ` ${fmt(r.rain)}` : ""}` : "" }),
       h("span", { class: "hr-lines" }),
-      h("span", { class: "hr-temp", text: num(r, "temp", "°") }),
-      h("span", { class: "hr-feel", text: num(r, "feel", "°") }),
+      h("span", { class: "hr-temp", text: num(r, "temp", "") }),
+      h("span", { class: "hr-feel", text: num(r, "feel", "") }),
       h("span", { class: "hr-wind", text: num(r, "wind", "") })));
     }
     const scroller = h("div", { class: "hr-scroll", tabindex: "0", "aria-label": "시간대별 값 — 옆으로 밀어 봅니다" },
@@ -160,7 +160,7 @@ window.TeukboRecords = (() => {
         cols));
     const strip = h("div", { class: "hr-strip", role: "group", "aria-label": label },
       h("div", { class: "hr-names", "aria-hidden": "true" }, h("span", { text: "시각" }), h("span", { text: "강수(mm)" }), h("span", { class: "hr-lines" }),
-        h("span", null, h("i", { class: "hr-key temp" }), "기온"), h("span", null, h("i", { class: "hr-key feel" }), "체감"), h("span", { text: "바람(m/s)" })),
+        h("span", null, h("i", { class: "hr-key temp" }), "기온(℃)"), h("span", null, h("i", { class: "hr-key feel" }), "체감(℃)"), h("span", { text: "바람(m/s)" })),
       scroller);
     // 옆으로 민 자리는 다시 그려도 그대로 둔다. 그 날을 처음 그릴 때는 눈여겨볼 시각이 가운데 오게 옮긴다
     scroller.addEventListener("scroll", () => { if (view.strip.key === key) view.strip.left = scroller.scrollLeft; }, { passive: true });
@@ -187,12 +187,12 @@ window.TeukboRecords = (() => {
     const low = hdoc.feel_stat !== "max";  // 겨울철 식을 쓰는 달은 가장 낮은 체감온도, 여름철 식을 쓰는 달은 가장 높은 체감온도를 앞세운다
     const peak = extreme(rows, "feel", low ? -1 : 1) || extreme(rows, "temp", low ? -1 : 1), other = extreme(rows, "feel", low ? 1 : -1);
     const tLow = extreme(rows, "temp", -1), tHigh = extreme(rows, "temp", 1), wet = rows.filter(isWet);
-    const fact = (label, value, strong) => h("div", { class: `rec-fact${strong ? " strong" : ""}` }, h("span", { text: label }), h("b", { text: value }));
+    const fact = (label, value, kind) => h("div", { class: `rec-fact${kind ? ` ${kind}` : ""}` }, h("span", { text: label }), h("b", { text: value }));
     const facts = [
-      peak && peak.feel != null ? fact(low ? "체감 최저" : "체감 최고", `${fmt(peak.feel)}℃ · ${pad(peak.hour)}시`, true) : null,
+      peak && peak.feel != null ? fact(low ? "체감 최저" : "체감 최고", `${fmt(peak.feel)}℃ · ${pad(peak.hour)}시`, "strong") : null,
       other && other.feel != null && other !== peak ? fact(low ? "체감 최고" : "체감 최저", `${fmt(other.feel)}℃ · ${pad(other.hour)}시`) : null,
-      tLow && tHigh ? fact("기온", `${fmt(tLow.temp)}℃(${pad(tLow.hour)}시) ~ ${fmt(tHigh.temp)}℃(${pad(tHigh.hour)}시)`) : null,
-      wet.length ? fact(wetName((wet.find((r) => r.pty) || {}).pty), hourSpans(wet.map((r) => r.hour))) : null];
+      tLow && tHigh ? fact("기온", `${fmt(tLow.temp)}℃(${pad(tLow.hour)}시) ~ ${fmt(tHigh.temp)}℃(${pad(tHigh.hour)}시)`, "wide") : null,
+      wet.length ? fact(wetName((wet.find((r) => r.pty) || {}).pty), hourSpans(wet.map((r) => r.hour)), "wide") : null];
     const label = `${dayLabel(ymd)} 시간대별. ${facts.filter(Boolean).map((node) => node.textContent).join(", ")}`;
     return put(box,
       h("div", { class: "rec-facts" }, facts),
