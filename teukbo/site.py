@@ -89,10 +89,12 @@ def build_records(data_dir: Path, out_dir: Path) -> int:
         from . import records
         from .config import load_config
 
-        return records.write_site_records(load_config(), data_dir, out_dir)
+        # 달력에서 날짜를 누르면 읽는 시간별 한 달 파일(data/hours/<지역>/<연-월>.json)도 같이 만든다
+        return records.write_site_records(load_config(), data_dir, out_dir, hours_dir=out_dir.parent / "hours")
     except Exception:  # noqa: BLE001 — 기록 때문에 배포가 멈추면 안 된다
         log.exception("지역별 기록을 만들지 못했습니다 — 기록 없이 사이트를 조립합니다.")
         shutil.rmtree(out_dir, ignore_errors=True)  # 쓰다 만 파일을 남기지 않는다
+        shutil.rmtree(out_dir.parent / "hours", ignore_errors=True)  # 기록 없이는 화면이 시간별 파일을 읽지 않는다
         return 0
 
 

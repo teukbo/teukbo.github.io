@@ -111,6 +111,9 @@ def main() -> int:
     print("\n[실시간 자료] (초단기실황·초단기예보 — 몇 분마다 도는 live.yml 이 쓰는 것)")
     check_live(cfg, now, data_go_kr_key, apihub_key, opts)
 
+    print("\n[시간별 실황 — 지난 시각] (초단기실황을 과거 기준시각으로 조회: 몇 시간 전 것까지 오는지, 전국을 받는 데 얼마나 걸리는지)")
+    check_ncst_history(cfg, now, data_go_kr_key, opts)
+
     print("\n[선로 강우] (기상청 레이더 합성영상을 직접 읽음 — 인증키 없이)")
     check_radar(now, opts)
 
@@ -217,6 +220,60 @@ def check_live(cfg, now, data_go_kr_key, apihub_key, opts: dict) -> None:
         entry = doc["regions"][r.id]
         print(f"        {r.name}: 지금 {entry.get('now')}")
         print("          6시간 " + " | ".join(f"{row['t'][11:13]}시 {row['temp']}℃ 비 {row['rain'] or '없음'} 바람 {row['wind']}" for row in entry.get("fcst", [])))
+
+
+def check_ncst_history(cfg, now, data_go_kr_key, opts: dict) -> None:
+    """초단기실황을 지난 기준시각으로 조회해 본다 — 시간별 실황 수집(teukbo/hourly.py)이 기대는 사실을 실제 응답으로 확인한다.
+
+    ① 몇 시간 전 기준시각까지 값이 오는가(2026-11-26: 23시간 전까지, 24시간 전부터는 '오류 코드 10 최근 1일 간의 자료만 제공합니다')
+    ② 격자 몇 곳을 수집과 같은 설정(동시 호출 수·대기 시간)으로 받을 때 걸리는 시간.
+    하루 호출 한도를 아끼려고 조금만 부른다(이 점검은 코드를 올릴 때마다 돈다).
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    if not data_go_kr_key:
+        print("  건너뜀 (공공데이터포털 인증키 미설정)")
+        return
+    hourly = cfg.settings.hourly
+    url = f"{kma_ultra.DATA_GO_KR_BASE}/getUltraSrtNcst"
+    quick = {"timeout_seconds": float(hourly["timeout_seconds"]), "backoff_seconds": float(hourly["backoff_seconds"])}
+    region = cfg.regions[0]
+    grid = (region.nx, region.ny)
+    latest = kma_ultra.base_time(kma_ultra.ncst_bases(now, count=1)[0])
+
+    def ask(hours_back: int, where=grid, http_opts=opts):
+        t = latest - timedelta(hours=hours_back)
+        return kma_ultra.parse_ncst(kma_ultra._fetch_grid(url, "serviceKey", data_go_kr_key, (t.strftime("%Y%m%d"), t.strftime("%H00")), where, http_opts, 1, "초단기실황"))
+
+    print(f"  기준 격자: {region.name} {grid[0]},{grid[1]} · 가장 최근 기준시각 {latest:%Y-%m-%d %H:%M}")
+    for back in (0, 12, int(hourly["max_back_hours"]), int(hourly["max_back_hours"]) + 1):
+        t = latest - timedelta(hours=back)
+        try:
+            row = ask(back)
+        except FetchError as e:
+            print(f"  실패  {back:>2}시간 전 ({t:%m-%d %H시}): {str(e)[:150]}")
+            continue
+        print(f"  정상  {back:>2}시간 전 ({t:%m-%d %H시}): {row}")
+
+    grids = sorted({(r.nx, r.ny) for r in cfg.regions})
+    sample = grids[:30]
+
+    def one(where):
+        started = time.monotonic()
+        try:
+            good = ask(1, where, quick) is not None
+        except FetchError:
+            good = False
+        return good, time.monotonic() - started
+
+    workers = int(hourly["workers"])
+    started = time.monotonic()
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        results = list(pool.map(one, sample))
+    took = time.monotonic() - started
+    each = sorted(seconds for _, seconds in results)
+    print(f"  격자 {len(sample)}곳(1시간 전)을 동시에 {workers}개씩: {took:.1f}초, 성공 {sum(1 for good, _ in results if good)}곳, 한 번에 중간 {each[len(each) // 2]:.2f}초·가장 느린 {each[-1]:.2f}초"
+          f" → 전국 {len(grids)}격자 × 3시각 어림 {took / len(sample) * len(grids) * 3:.0f}초")
 
 
 def check_radar(now, opts: dict) -> None:
