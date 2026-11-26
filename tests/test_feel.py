@@ -28,9 +28,17 @@ class WinterFormulaTest(unittest.TestCase):
 
     def test_outside_the_formula_range_it_is_the_air_temperature(self):
         self.assertEqual(kma_winter_apparent_temp(10.1, 8), 10.1)  # 기온 10℃ 초과
-        self.assertEqual(kma_winter_apparent_temp(-10, 1.2), -10)  # 풍속 1.3m/s 미만
-        self.assertLess(kma_winter_apparent_temp(10.0, 8), 10.0)  # 경계(10℃, 1.3m/s)에서는 식을 쓴다
-        self.assertNotEqual(kma_winter_apparent_temp(-10, 1.3), -10)
+        self.assertEqual(kma_winter_apparent_temp(-10, 1.2), -10)  # 바람이 약하면 기온 그대로
+        self.assertLess(kma_winter_apparent_temp(10.0, 8), 10.0)  # 기온 10℃ 는 식을 쓴다
+
+    def test_wind_boundary_matches_what_the_weather_agency_displays(self):
+        # 기상청 설명문은 "1.3m/s 이상"이지만 계산기와 날씨누리는 4.8km/h(1.333…m/s)를 '넘을' 때만 식을 쓴다.
+        # 날씨누리 정시 관측 표(2026-11-26)의 풍속 1.3m/s 행: (기온, 표시된 체감온도) — 모두 체감온도 = 기온이었다.
+        for temp, shown in ((0.2, 0.2), (-0.2, -0.2), (3.0, 3.0)):
+            self.assertEqual(round(kma_winter_apparent_temp(temp, 1.3), 1), shown)
+        self.assertEqual(kma_winter_apparent_temp(-10, 1.3), -10)
+        self.assertLess(kma_winter_apparent_temp(-10, 1.4), -10)  # 1.4m/s(5.04km/h)부터 식
+        self.assertLess(kma_winter_apparent_temp(0.2, 1.4), 0.2)
 
 
 class FeelSeriesTest(unittest.TestCase):

@@ -8,7 +8,7 @@ from datetime import date
 from pathlib import Path
 from unittest import mock
 
-from teukbo import obs, rail, rail_run, records, site, storage
+from teukbo import hourly, obs, rail, rail_run, records, site, storage
 from teukbo.indicators import kma_summer_apparent_temp, kma_winter_apparent_temp
 from teukbo.sources import asos
 
@@ -105,33 +105,22 @@ class WarningDaysTest(unittest.TestCase):
 
 
 class DayValuesTest(unittest.TestCase):
-    MONTHS = CFG.settings.feel_summer_months
-
-    def test_winter_day(self):
+    def test_values_follow_the_vars_order_with_one_decimal(self):
         row = obs_row(date(2026, 12, 10), temp_min=-12.34, temp_max=-2.06, wind_avg=3.1, rh_min=30.0, rain=None, snow_new=3.24, wind_max=7.4, gust_max=13.0)
-        values = dict(zip(records.VARS, records.day_values(row, date(2026, 12, 10), self.MONTHS)))
-        self.assertEqual(values["feel_min"], round(kma_winter_apparent_temp(-12.34, 3.1), 1))
-        self.assertLess(values["feel_min"], values["temp_min"])
-        self.assertIsNone(values["feel_max"])  # 여름철 값은 겨울에 싣지 않는다
+        values = dict(zip(records.VARS, records.day_values(row)))
         self.assertEqual((values["temp_min"], values["temp_max"], values["rain"], values["snow_new"], values["wind_max"], values["gust_max"]), (-12.3, -2.1, 0.0, 3.2, 7.4, 13.0))
 
-    def test_summer_day(self):
-        row = obs_row(date(2027, 7, 20), temp_min=25.0, temp_max=34.0, wind_avg=2.0, rh_min=55.0, rain=12.5)
-        values = dict(zip(records.VARS, records.day_values(row, date(2027, 7, 20), self.MONTHS)))
-        self.assertEqual(values["feel_max"], round(kma_summer_apparent_temp(34.0, 55.0), 1))
-        self.assertIsNone(values["feel_min"])
-        self.assertEqual((values["rain"], values["snow_new"]), (12.5, 0.0))
+    def test_daily_values_carry_no_feel_temperature_estimate(self):
+        # 하루 값(최저기온·평균풍속)으로 어림한 체감온도는 싣지 않는다 — 새벽에는 바람이 약해 실제보다 낮게 나왔다(보성군 2026-11-24: -4.1℃ 대 실제 -1.5℃)
+        self.assertEqual(records.VARS, ("temp_min", "temp_max", "rain", "snow_new", "wind_max", "gust_max"))
+        self.assertFalse(hasattr(records, "FEEL_BASIS"))
 
     def test_missing_ingredients(self):
-        row = obs_row(date(2026, 12, 10), temp_min=-5.0, temp_max=2.0)  # 풍속이 없다
-        values = dict(zip(records.VARS, records.day_values(row, date(2026, 12, 10), self.MONTHS)))
-        self.assertIsNone(values["feel_min"])
+        row = obs_row(date(2026, 12, 10), temp_min=-5.0, temp_max=2.0)
+        values = dict(zip(records.VARS, records.day_values(row)))
         self.assertIsNone(values["wind_max"])
-        self.assertIsNone(records.day_values(obs_row(date(2026, 12, 10), rh_avg=50.0), date(2026, 12, 10), self.MONTHS))  # 쓸 값이 하나도 없는 날
-
-    def test_calm_or_mild_winter_day_feels_like_the_air_temperature(self):
-        row = obs_row(date(2026, 11, 3), temp_min=11.0, temp_max=18.0, wind_avg=4.0)
-        self.assertEqual(dict(zip(records.VARS, records.day_values(row, date(2026, 11, 3), self.MONTHS)))["feel_min"], 11.0)
+        self.assertEqual((values["rain"], values["snow_new"]), (0.0, 0.0))  # 그날 관측이 있는데 비어 있으면 '없음'
+        self.assertIsNone(records.day_values(obs_row(date(2026, 12, 10), rh_avg=50.0)))  # 쓸 값이 하나도 없는 날
 
 
 class BuildTest(unittest.TestCase):
@@ -161,8 +150,9 @@ class BuildTest(unittest.TestCase):
         self.assertEqual((doc["schema"], doc["id"], doc["name"]), (1, "beolgyo", "보성(벌교)"))
         self.assertEqual((doc["station"]["stn"], doc["station"]["name"]), ("258", "보성군"))
         self.assertEqual((doc["from"], doc["to"], doc["obs_to"]), ("2026-11-15", "2026-11-25", "2026-11-24"))
-        self.assertEqual(doc["vars"], ["temp_min", "temp_max", "feel_min", "feel_max", "rain", "snow_new", "wind_max", "gust_max"])
-        self.assertEqual(doc["feel_basis"], {"min": "최저기온·평균풍속", "max": "최고기온·최저습도"})
+        self.assertEqual(doc["vars"], ["temp_min", "temp_max", "rain", "snow_new", "wind_max", "gust_max"])
+        self.assertNotIn("feel_basis", doc)
+        self.assertIsNone(doc["hours"])  # 시간별 값이 아직 없다
         self.assertEqual(list(doc["days"]), ["2026-11-18", "2026-11-20", "2026-11-21", "2026-11-24", "2026-11-25"])
         json.dumps(doc)  # JSON 으로 쓸 수 있는 값만
 
@@ -171,7 +161,6 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(days["2026-11-18"]["w"], [["strong_wind", "advisory", "2026-11-18T04:00+09:00", "2026-11-18T15:00+09:00"]])  # 건조는 뺀다
         values = dict(zip(records.VARS, days["2026-11-18"]["o"]))
         self.assertEqual((values["temp_min"], values["gust_max"], values["rain"], values["snow_new"]), (3.1, 21.4, 2.5, 0.0))
-        self.assertEqual(values["feel_min"], round(kma_winter_apparent_temp(3.1, 6.2), 1))
         cold = ["cold_wave", "advisory", "2026-11-20T21:00+09:00", "2026-11-21T10:00+09:00"]
         self.assertEqual(days["2026-11-20"], {"w": [cold]})  # 관측이 없는 날: o 키가 없다
         self.assertEqual(days["2026-11-21"]["w"], [cold])
@@ -220,12 +209,161 @@ class BuildTest(unittest.TestCase):
         self.assertEqual([d["id"] for d in docs], [r.id for r in CFG.regions])
         for doc in docs:
             for day, entry in doc["days"].items():
-                self.assertTrue(doc["from"] <= day <= max(doc["to"], doc["obs_to"] or doc["to"]), (doc["id"], day))
+                last = max(d for d in (doc["to"], doc["obs_to"], (doc["hours"] or {}).get("to")) if d)
+                self.assertTrue(doc["from"] <= day <= last, (doc["id"], day))
                 for kind, level, start, end in entry.get("w", []):
                     self.assertIn(kind, CFG.thresholds.types)
                     self.assertIn(level, CFG.thresholds.levels)
                     self.assertLessEqual(start[:10], day)
                     self.assertTrue(end is None or end[:10] >= day)
+
+
+def write_hour(data_dir: Path, t, rows: dict) -> None:
+    """data/hourly/날짜/시.json 을 손으로 만든다. rows: 격자 키 → [기온, 습도, 풍속, 강수량, 강수형태]."""
+    storage.write_json(hourly.hour_path(data_dir, t), {"schema": 1, "t": t.isoformat(timespec="minutes"), "vars": list(hourly.VARS), "grids": rows})
+
+
+class HoursTest(unittest.TestCase):
+    """시간별 실황 → 지역별 한 달 파일, 그리고 기록에 싣는 그날의 요약."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.out = Path(tempfile.mkdtemp()) / "hours"
+        self.region = region("beolgyo")
+        self.key = hourly.grid_key((self.region.nx, self.region.ny))
+
+    def fill_day(self, year, month, day, hours=range(24), temp=lambda h: -4.0 + abs(h - 14) * -0.5, rh=60, wind=3.0, rain=0.0, pty=0):
+        for h in hours:
+            write_hour(self.dir, kst(year, month, day, h), {self.key: [round(temp(h), 1), rh, wind, rain, pty], "999,999": [9.9, 50, 1.0, 0.0, 0]})
+
+    def month(self, name="2026-11", region_id="beolgyo"):
+        return json.loads((self.out / region_id / f"{name}.json").read_text(encoding="utf-8"))
+
+    def test_month_file_shape(self):
+        self.fill_day(2026, 11, 26)
+        summary = records.build_hours(CFG, self.dir, self.out)
+        doc = self.month()
+        self.assertEqual((doc["schema"], doc["id"], doc["name"], doc["month"], doc["grid"]), (1, "beolgyo", "보성(벌교)", "2026-11", [self.region.nx, self.region.ny]))
+        self.assertEqual(doc["vars"], ["temp", "feel", "rain", "wind", "rh", "pty"])
+        self.assertEqual(doc["feel_stat"], "min")  # 겨울철 식을 쓰는 달
+        self.assertIn("초단기실황", doc["source"])
+        self.assertIn("계산", doc["source"])  # 체감온도가 가공값임을 밝힌다
+        day = doc["days"]["2026-11-26"]
+        self.assertEqual(day["h"], list(range(24)))
+        self.assertEqual(len(day["v"]), 24)
+        temp, feel, rain, wind, rh, pty = day["v"][14]
+        self.assertEqual((temp, rain, wind, rh, pty), (-4.0, 0.0, 3.0, 60, 0))
+        self.assertEqual(feel, round(kma_winter_apparent_temp(-4.0, 3.0), 1))
+        self.assertEqual(summary["beolgyo"]["2026-11-26"]["h"], 24)
+        self.assertEqual(sorted(p.name for p in self.out.iterdir()), sorted(r.id for r in CFG.regions if hourly.grid_key((r.nx, r.ny)) == self.key))  # 값이 있는 지역만
+
+    def test_feel_follows_the_season_and_needs_its_ingredients(self):
+        self.assertEqual(records.hour_feel(-4.0, 60, 3.0, summer=False), round(kma_winter_apparent_temp(-4.0, 3.0), 1))
+        self.assertEqual(records.hour_feel(31.0, 70, 3.0, summer=True), round(kma_summer_apparent_temp(31.0, 70), 1))
+        self.assertEqual(records.hour_feel(0.2, 60, 1.3, summer=False), 0.2)  # 바람이 약하면 기온 그대로
+        self.assertIsNone(records.hour_feel(-4.0, 60, None, summer=False))  # 겨울철 식은 풍속이 있어야
+        self.assertIsNone(records.hour_feel(31.0, None, 3.0, summer=True))  # 여름철 식은 습도가 있어야
+        self.assertIsNone(records.hour_feel(None, 60, 3.0, summer=False))
+        self.fill_day(2027, 7, 20, temp=lambda h: 24.0 + (10 - abs(h - 15)) * 0.8, rh=70)
+        records.build_hours(CFG, self.dir, self.out)
+        doc = self.month("2027-07")
+        self.assertEqual(doc["feel_stat"], "max")  # 여름철 식을 쓰는 달
+        temp, feel = doc["days"]["2027-07-20"]["v"][15][:2]
+        self.assertEqual(feel, round(kma_summer_apparent_temp(temp, 70), 1))
+
+    def test_day_summary_gives_the_extremes_and_when(self):
+        self.fill_day(2026, 11, 26)
+        entry = records.build_hours(CFG, self.dir)["beolgyo"]["2026-11-26"]
+        feels = [round(kma_winter_apparent_temp(round(-4.0 + abs(h - 14) * -0.5, 1), 3.0), 1) for h in range(24)]
+        self.assertEqual(entry, {"h": 24, "f": [min(feels), feels.index(min(feels)), max(feels), feels.index(max(feels))]})
+        self.assertEqual((entry["f"][1], entry["f"][3]), (0, 14))  # 가장 추운 시각 00시, 가장 덜 추운 시각 14시
+        self.assertFalse((self.out).exists())  # out_dir 를 주지 않으면 파일은 쓰지 않는다
+
+    def test_too_few_hours_give_no_daily_extremes(self):
+        need = int(CFG.settings.records["feel_min_hours"])
+        self.fill_day(2026, 11, 25, hours=range(24 - need + 1, 24))  # need - 1 시각뿐
+        self.fill_day(2026, 11, 26, hours=range(0, need))
+        summary = records.build_hours(CFG, self.dir, self.out)["beolgyo"]
+        self.assertEqual(summary["2026-11-25"], {"h": need - 1})  # 일부 시각만으로 그날의 최저·최고를 내세우지 않는다
+        self.assertEqual(summary["2026-11-26"]["h"], need)
+        self.assertIn("f", summary["2026-11-26"])
+        self.assertEqual(self.month()["days"]["2026-11-25"]["h"], list(range(24 - need + 1, 24)))  # 시각별 값은 있는 만큼 싣는다
+
+    def test_hours_without_values_are_left_out(self):
+        write_hour(self.dir, kst(2026, 11, 26, 3), {self.key: [None, None, None, None, None]})
+        write_hour(self.dir, kst(2026, 11, 26, 4), {"1,1": [1.0, 50, 1.0, 0.0, 0]})  # 다른 격자만
+        write_hour(self.dir, kst(2026, 11, 26, 5), {self.key: [1.5, None, None, 0.0, 0]})  # 풍속이 없다
+        summary = records.build_hours(CFG, self.dir, self.out)
+        day = self.month()["days"]["2026-11-26"]
+        self.assertEqual(day["h"], [5])
+        self.assertEqual(day["v"], [[1.5, None, 0.0, None, None, 0]])  # 체감온도는 재료가 없어 null
+        self.assertEqual(summary["beolgyo"]["2026-11-26"], {"h": 1})
+        self.assertEqual(records.build_hours(CFG, Path(tempfile.mkdtemp()), self.out), {})  # 시간별 값이 전혀 없으면 아무것도 만들지 않는다
+
+    def test_regions_sharing_a_grid_each_get_their_own_file(self):
+        by_grid: dict = {}
+        for r in CFG.regions:
+            by_grid.setdefault((r.nx, r.ny), []).append(r.id)
+        grid, ids = next((g, v) for g, v in by_grid.items() if len(v) > 1)
+        write_hour(self.dir, kst(2026, 11, 26, 6), {hourly.grid_key(grid): [1.0, 50, 2.0, 0.0, 0]})
+        summary = records.build_hours(CFG, self.dir, self.out)
+        self.assertEqual(sorted(summary), sorted(ids))
+        for region_id in ids:
+            self.assertEqual(self.month(region_id=region_id)["days"]["2026-11-26"]["h"], [6])
+
+    def test_keep_days_limits_the_months_and_days(self):
+        self.fill_day(2026, 9, 30, hours=[12])
+        self.fill_day(2026, 11, 25, hours=[12])
+        self.fill_day(2026, 11, 26, hours=[12])
+        cfg = dataclasses.replace(CFG, settings=dataclasses.replace(CFG.settings, records={**CFG.settings.records, "keep_days": 2}))
+        summary = records.build_hours(cfg, self.dir, self.out)
+        self.assertEqual(sorted(summary["beolgyo"]), ["2026-11-25", "2026-11-26"])
+        self.assertFalse((self.out / "beolgyo" / "2026-09.json").exists())
+        self.assertEqual(sorted(hourly.stored_days(self.dir)), ["2026-09-30", "2026-11-25", "2026-11-26"])  # 원자료는 지우지 않는다
+
+    def test_record_carries_hour_counts_extremes_and_span(self):
+        write_events(self.dir, {"20261120": [], "20261126": []})
+        self.fill_day(2026, 11, 25, hours=range(8, 24))
+        self.fill_day(2026, 11, 26)
+        obs.save_rows(self.dir, "258", "보성군", [obs_row(date(2026, 11, 25), temp_min=-1.0, temp_max=5.0)])
+        docs = {d["id"]: d for d in records.build_all(CFG, self.dir, STATIONS)}
+        doc = docs["beolgyo"]
+        self.assertEqual(doc["hours"], {"from": "2026-11-25", "to": "2026-11-26"})
+        self.assertEqual(sorted(doc["days"]["2026-11-25"]), ["h", "o"])  # 16시각뿐이라 그날의 체감 최저·최고는 없다
+        self.assertEqual(doc["days"]["2026-11-25"]["h"], 16)
+        self.assertEqual(sorted(doc["days"]["2026-11-26"]), ["f", "h"])  # 관측소 일자료가 아직 없어도 시간별 값만으로 날을 싣는다
+        self.assertEqual(len(doc["days"]["2026-11-26"]["f"]), 4)
+        self.assertIsNone(docs["L1022210"]["hours"])  # 시간별 값이 없는 지역
+        json.dumps(doc)
+
+    def test_site_writes_month_files_next_to_the_records(self):
+        (self.dir / "latest.json").write_text("{}", encoding="utf-8")
+        write_events(self.dir, {"20261126": []})
+        self.fill_day(2026, 11, 26)
+        out = Path(tempfile.mkdtemp()) / "_site"
+        site.build_site(self.dir, out)
+        self.assertTrue((out / "data" / "hours" / "beolgyo" / "2026-11.json").is_file())
+        self.assertEqual(json.loads((out / "data" / "records" / "beolgyo.json").read_text(encoding="utf-8"))["days"]["2026-11-26"]["h"], 24)
+        self.assertFalse((self.dir / "hours").exists())  # 배포 전용: 자료 폴더에는 만들지 않는다
+
+    def test_records_survive_a_failure_in_the_hourly_part(self):
+        write_events(self.dir, {"20261118": [[ZONE, "강풍", "주의보", "1", "202611180300", "202611180400", None]]})
+        self.fill_day(2026, 11, 26)
+        out = Path(tempfile.mkdtemp()) / "records"
+        with mock.patch.object(records, "build_hours", side_effect=RuntimeError("시간별 오류")):
+            self.assertEqual(records.write_site_records(CFG, self.dir, out, STATIONS, hours_dir=self.out), len(CFG.regions))
+        doc = json.loads((out / "beolgyo.json").read_text(encoding="utf-8"))
+        self.assertIn("2026-11-18", doc["days"])  # 특보 기록은 그대로
+        self.assertIsNone(doc["hours"])
+
+    def test_local_mode_serves_month_files_only(self):
+        from teukbo import local
+
+        web, data = Path("/srv/web"), Path("/srv/data")
+        self.assertEqual(local.resolve_path("/data/hours/beolgyo/2026-11.json", web, data), data / "hours" / "beolgyo" / "2026-11.json")
+        self.assertIsNone(local.resolve_path("/data/hours/beolgyo/../../latest.json", web, data))
+        self.assertIsNone(local.resolve_path("/data/hours/beolgyo/2026-11.txt", web, data))
+        self.assertIsNone(local.resolve_path("/data/hourly/2026-11-26/07.json", web, data))  # 원자료는 내보내지 않는다
 
 
 class SiteTest(unittest.TestCase):
@@ -263,7 +401,7 @@ class SiteTest(unittest.TestCase):
         from teukbo.config import ROOT
 
         ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
-        for line in ("/data/records/", "/data/work_rules.json"):
+        for line in ("/data/records/", "/data/hours/", "/data/work_rules.json"):
             self.assertIn(line, ignore)
         self.assertNotIn("/data/obs", ignore)  # 관측 일자료는 커밋해서 쌓는다
 

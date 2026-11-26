@@ -8,7 +8,7 @@ window.TeukboLive = (() => {
   "use strict";
 
   const RANK = { unknown: -1, low: 0, caution: 1, high: 2, active: 3 };
-  const PTY = { 0: "", 1: "비", 2: "비/눈", 3: "눈", 5: "빗방울", 6: "빗방울·눈날림", 7: "눈날림" };
+  const PTY = { 0: "", 1: "비", 2: "비/눈", 3: "눈", 4: "소나기", 5: "빗방울", 6: "빗방울·눈날림", 7: "눈날림" };
   const SKY = { 1: "맑음", 3: "구름많음", 4: "흐림" };
   const WIND16 = ["북", "북북동", "북동", "동북동", "동", "동남동", "남동", "남남동", "남", "남남서", "남서", "서남서", "서", "서북서", "북서", "북북서"];
   const RADAR_BASE = "https://www.kma.go.kr/repositary/image/rdr/img/RDR_CMP_WRC_";

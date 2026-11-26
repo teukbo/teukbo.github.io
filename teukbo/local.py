@@ -122,6 +122,8 @@ def resolve_path(url_path: str, web_dir: Path, data_dir: Path) -> Path | None:
             return data_dir / "detail" / rest[1]
         if len(rest) == 2 and rest[0] == "records" and rest[1].endswith(".json"):  # 지역별 특보 기록(records_once 가 만든다)
             return data_dir / "records" / rest[1]
+        if len(rest) == 3 and rest[0] == "hours" and rest[2].endswith(".json"):  # 지역별 시간대 실황 한 달치(records_once 가 만든다)
+            return data_dir / "hours" / rest[1] / rest[2]
         if rest == ["work_rules.json"]:  # 폭염·한파 작업 기준(배포 때는 이 이름으로 복사된다)
             return ROOT / "config" / "work_rules.json"
         return None
@@ -271,10 +273,12 @@ def rail_once(cfg: Config, data_dir: Path, env: Mapping[str, str]) -> None:
 def records_once(cfg: Config, data_dir: Path, env: Mapping[str, str]) -> None:
     """관측 일자료를 이어 받고(인증키가 있을 때) 지역별 특보 기록을 다시 만든다 — 첫 화면의 '특보 기록'이 읽는다. 실패해도 넘어간다."""
     try:
-        from . import obs, records
+        from . import hourly, obs, records
 
-        obs.run(cfg, now_kst().replace(second=0, microsecond=0), data_dir, env)
-        records.write_site_records(cfg, data_dir, data_dir / "records")
+        now = now_kst().replace(second=0, microsecond=0)
+        obs.run(cfg, now, data_dir, env)
+        hourly.run(cfg, now, data_dir, env)  # 시간별 실황(최근 23시간까지 — 이 컴퓨터가 켜져 있던 동안의 것만 쌓인다)
+        records.write_site_records(cfg, data_dir, data_dir / "records", hours_dir=data_dir / "hours")
     except Exception as e:  # noqa: BLE001
         print(f"  특보 기록: 만들지 못했습니다 ({type(e).__name__}: {e})")
 

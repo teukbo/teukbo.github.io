@@ -82,18 +82,21 @@ def add_apparent_temp(ms: ModelSeries) -> None:
     ms._maps.pop("apparent", None)
 
 
-# 기상청 겨울철 체감온도 식을 쓰는 범위: 기온 10℃ 이하, 풍속 1.3m/s 이상. 그 밖에서는 체감온도 = 기온.
+# 기상청 겨울철 체감온도 식을 쓰는 범위: 기온 10℃ 이하, 풍속 4.8km/h 초과. 그 밖에서는 체감온도 = 기온.
+# 기상청 설명문은 "풍속 1.3m/s 이상"이라고 적지만, 같은 쪽의 계산기와 날씨누리의 실제 표출은 4.8km/h(약 1.33m/s)를 '넘을' 때만
+# 식을 쓴다 — 풍속 1.3m/s(4.68km/h)인 시각은 체감온도 = 기온으로 나온다(2026-11-26, 날씨누리 정시 관측 표 277행으로 확인).
+# 실제 표출과 같게 맞춘다. 풍속은 m/s 로 받아 km/h 로 바꿔 견준다.
 WINTER_FEEL_MAX_TEMP = 10.0
-WINTER_FEEL_MIN_WIND = 1.3
+WINTER_FEEL_OVER_WIND_KMH = 4.8
 
 
 def kma_winter_apparent_temp(temp_c: float, wind_ms: float) -> float:
     """기상청 겨울철 체감온도(℃).
 
     체감온도 = 13.12 + 0.6215·T − 11.37·V^0.16 + 0.3965·V^0.16·T  (T 기온 ℃, V 풍속 km/h = m/s × 3.6)
-    기온이 10℃를 넘거나 풍속이 1.3m/s 에 못 미치면 식을 쓰지 않고 기온을 그대로 돌려준다.
+    기온이 10℃를 넘거나 풍속이 4.8km/h 를 넘지 않으면 식을 쓰지 않고 기온을 그대로 돌려준다.
     """
-    if temp_c > WINTER_FEEL_MAX_TEMP or wind_ms < WINTER_FEEL_MIN_WIND:
+    if temp_c > WINTER_FEEL_MAX_TEMP or wind_ms * 3.6 <= WINTER_FEEL_OVER_WIND_KMH:
         return temp_c
     v = (wind_ms * 3.6) ** 0.16
     return 13.12 + 0.6215 * temp_c - 11.37 * v + 0.3965 * v * temp_c

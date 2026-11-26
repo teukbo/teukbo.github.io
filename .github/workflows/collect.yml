@@ -40,7 +40,7 @@ jobs:
   collect:
     name: 수집·계산
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     outputs:
       ran: ${{ steps.due.outputs.run }}
     steps:
@@ -88,6 +88,16 @@ jobs:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
         run: python3 -m teukbo.obs
 
+      - name: 시간별 실황 이어 받기 (기상청 초단기실황 — 지역별 기록의 '시간대별 체감온도·날씨')
+        if: ${{ steps.due.outputs.run == 'true' }}
+        # 못 받아도 기상 수집·배포는 계속한다. 최근 23시간까지만 조회되므로 오래된 시각부터 받고, 한 번 실행에 쓰는 시간과 하루 호출 수에 상한을 둔다(settings.json 의 hourly).
+        continue-on-error: true
+        timeout-minutes: 7
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+          KMA_APIHUB_KEY: ${{ secrets.KMA_APIHUB_KEY }}
+        run: python3 -m teukbo.hourly
+
       - name: 이력 커밋
         if: ${{ steps.due.outputs.run == 'true' }}
         run: |
@@ -96,6 +106,7 @@ jobs:
           git add data/history data/accuracy.json
           if [ -d data/rail ]; then git add data/rail; fi
           if [ -d data/obs ]; then git add data/obs; fi
+          if [ -d data/hourly ]; then git add data/hourly; fi
           if git diff --cached --quiet; then
             echo "커밋할 변경이 없습니다."
             exit 0
