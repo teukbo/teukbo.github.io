@@ -459,9 +459,10 @@
     const stageLabel = (stage) => (stage.level ? stage.name : `${metric.label || "체감온도"} ${stage.min != null ? `${stage.min}${unit} 이상` : `${stage.max}${unit} 이하`}${stage.name ? ` ${stage.name}` : ""}`);
     const temp = w ? (metric.stat === "min" ? w.tempMin : w.tempMax) : null;
     const status = extreme ? `${metric.stat === "min" ? "가장 낮은" : "가장 높은"} ${metric.label || "체감온도"} ${Math.round(extreme.v)}${unit} · ${whenText(extreme.t)}` : doc === "loading" ? "예보를 불러오는 중…" : "";
-    const body = [
-      status ? h("p", { class: "work-status" }, Icons.hazard(guide.type, { live: true }), h("span", null, h("b", { text: status }),
-        h("small", null, `${temp ? `기온은 ${metric.stat === "min" ? "최저" : "최고"} ${Math.round(temp.v)}${unit} · ` : ""}${reached ? `‘${stageLabel(reached)}’ 단계에 해당` : "지금 예보로는 해당하는 단계가 없습니다"}`))) : null,
+    // head: 지금 예보의 체감온도 한 줄(제 칸으로 보일 때만 쓴다 — 날씨 칸 끝에 접혀 있을 때는 바로 위에 같은 값이 있다), rest: 단계 · 기본수칙 · 근거
+    const head = status ? h("p", { class: "work-status" }, Icons.hazard(guide.type, { live: true }), h("span", null, h("b", { text: status }),
+      h("small", null, `${temp ? `기온은 ${metric.stat === "min" ? "최저" : "최고"} ${Math.round(temp.v)}${unit} · ` : ""}${reached ? `‘${stageLabel(reached)}’ 단계에 해당` : "지금 예보로는 해당하는 단계가 없습니다"}`))) : null;
+    const rest = [
       h("ol", { class: "stages" }, stages),
       (guide.basics || []).length ? h("p", { class: "work-basics" }, h("b", { text: `${guide.basics_title || "기본 수칙"} ` }), guide.basics.join(" · ")) : null,
       // 긴 설명(유의할 점·단계별 근거·출처)은 접어 둔다
@@ -473,11 +474,11 @@
     if (!notable && doc === "loading") return null;
     // 접어 둔 채로도 지금 어느 단계인지는 제목에서 보이게
     const where = reached ? `${stageLabel(reached)} 단계` : near ? `${stageLabel(near[0])} ${near[1]}` : w ? "해당 단계 없음" : "";
-    const folded = () => fold(`work-${guide.id}`, `${guide.title}${where ? ` — ${where}` : ""}`, body);
-    if (!notable && w) return { tail: h("div", { class: "work work-tail", role: "group", "aria-label": guide.title }, folded()) };
+    const folded = (...kids) => fold(`work-${guide.id}`, `${guide.title}${where ? ` — ${where}` : ""}`, kids);
+    if (!notable && w) return { tail: h("div", { class: "work work-tail", role: "group", "aria-label": guide.title }, folded(rest)) };
     const box = h("section", { class: "glass work", "aria-label": guide.title });
-    if (state.type && notable) return { card: put(box, h("p", { class: "glass-title" }, guide.title, guide.subtitle ? h("small", null, ` ${guide.subtitle}`) : null), body) };
-    return { card: put(box, folded()) };
+    if (state.type && notable) return { card: put(box, h("p", { class: "glass-title" }, guide.title, guide.subtitle ? h("small", null, ` ${guide.subtitle}`) : null), head, rest) };
+    return { card: put(box, folded(head, rest)) };
   }
 
   /** 시간별 예보에 기대는 칸(날씨 한 줄 · 작업 기준 · 날씨)을 채운다. 가능성의 머리는 건드리지 않는다. animate: 새로 나타나게. */

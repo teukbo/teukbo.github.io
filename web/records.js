@@ -210,7 +210,7 @@ window.TeukboRecords = (() => {
     const low = !hdoc || hdoc.feel_stat !== "max";  // 겨울철 식을 쓰는 달은 가장 낮은 체감온도, 여름철 식을 쓰는 달은 가장 높은 체감온도를 적는다
     const whole = Array.isArray(day.f) && day.f.length === 4;  // 그날 전체의 값으로 볼 수 있는가
     // 칸 하나: 이름 아래에 값. 이름 뒤에 덧붙는 말(more)은 좁은 화면에서 한 덩이로 줄이 바뀌고, 값 옆의 작은 글(tail)은 넓은 칸에서만 쓴다
-    const tile = (label, value, kind, more, tail) => h("div", { class: `rec-fact${kind ? ` ${kind}` : ""}` }, h("span", null, label, more ? h("i", { text: ` ${more}` }) : null), h("b", null, value, tail ? h("small", { text: ` ${tail}` }) : null));
+    const tile = (label, value, kind, more, tail) => h("div", { class: `rec-fact${kind ? ` ${kind}` : ""}` }, h("span", null, label, more ? [" ", h("i", { text: more })] : null), h("b", null, value, tail ? h("small", { text: ` ${tail}` }) : null));
     const tiles = [];
     let peak = null;
     if (rows.length) {
@@ -236,9 +236,9 @@ window.TeukboRecords = (() => {
     if (daily) { if (v("wind_max") != null) tiles.push(tile("최대풍속", `${fmt(v("wind_max"))}m/s`)); if (v("gust_max") != null) tiles.push(tile("순간풍속", `${fmt(v("gust_max"))}m/s`)); }
     else { const w = extreme(rows, "wind", 1); if (w) tiles.push(tile("바람 최대", `${fmt(w.wind)}m/s`)); }
 
-    const since = doc.hours && doc.hours.from;
+    const since = doc.hours && doc.hours.from, last = [doc.obs_to, doc.hours && doc.hours.to].filter(Boolean).sort().pop();  // 시간별 값의 첫날 · 값이 하나라도 있는 마지막 날
     const note = day.h && !rows.length ? "시간대별 값을 불러오지 못했습니다. 날짜를 다시 눌러 보세요."
-      : !tiles.length ? "이 날의 관측값은 아직 없습니다."
+      : !tiles.length ? (!last || ymd > last ? "이 날의 관측값은 아직 없습니다." : !doc.station && since && ymd < since ? `관측값은 ${dayLabel(since)}부터 있습니다.` : "이 날의 관측값은 없습니다.")
       : !rows.length ? (since && ymd < since ? `시간대별 값은 ${dayLabel(since)}부터 있습니다.` : since ? "이 날은 시간대별 값을 받지 못했습니다." : null)
       : !daily ? `${whole ? "시간대별 값" : `받은 ${rows.length}시간`} 기준입니다(${doc.station ? "하루 값은 아직 없음" : "가까운 관측소 없음"}).`
       : !whole ? `시간대별 값은 ${rows.length}시간치만 있습니다.` : null;
