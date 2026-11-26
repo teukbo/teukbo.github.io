@@ -1192,6 +1192,8 @@ body.home .result .when { font-size: 16.5px; }
 .work > .fold { margin-top: 0; border-top: 0; }
 .work > .fold > summary { min-height: 28px; padding: 0; font-size: 15px; }
 .work > .fold > .fold-body { padding: 4px 0 0; }
+/* 해당하는 단계가 없는 날: 날씨 칸 끝에 접힌 한 줄로 붙는다(칸을 따로 차지하지 않는다) */
+.weather > .work-tail { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
 
 /* 특보 기록(records.js): 한 달 달력 — 칸마다 날짜 · 관측값 · 특보 단계 띠 */
 body.home .records h2 { margin: 0 0 8px; font-size: 17px; }
@@ -1221,41 +1223,42 @@ body.home .records h2 { margin: 0 0 8px; font-size: 17px; }
 .rec-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; color: var(--ink-2); font-size: 12.5px; }
 .rec-swatch { display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 3px; }
 .rec-day { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255, 255, 255, 0.07); }
+.rec-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .rec-day-title { margin: 0; font-size: 16px; font-weight: 700; }
+.rec-quiet { flex: none; color: var(--ink-2); font-size: 13px; }
 .rec-warns { margin: 8px 0 0; padding: 0; list-style: none; }
 .rec-warns li { margin: 0 0 4px; font-size: 15px; word-break: keep-all; }
 .rec-warns small { color: var(--ink-2); font-size: 13px; }
 .rec-tag { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.7; }
-.rec-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin-top: 10px; }
+/* 그날의 숫자: 한 줄에 셋씩. 첫 칸(체감온도)은 조금 넓고 크게. 이름 아래에 값, 값 옆의 작은 글은 그 시각 */
+.rec-facts { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 10px; margin-top: 12px; }
 .rec-fact span { display: block; color: var(--ink-3); font-size: 12px; }
-.rec-fact b { font-size: 15.5px; font-variant-numeric: tabular-nums; }
-.rec-fact:last-child { grid-column: 1 / -1; }
+.rec-fact span i { display: inline-block; font-style: normal; }
+.rec-fact b { font-size: 15.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rec-fact b small { color: var(--ink-2); font-size: 12px; font-weight: 400; }
+.rec-fact.strong b { font-size: 19px; }
+.rec-fact.wide { grid-column: 1 / -1; }
+.rec-note { margin: 10px 0 0; color: var(--ink-2); font-size: 12.5px; word-break: keep-all; }
 .rec-none { margin: 10px 0 0; color: var(--ink-2); font-size: 14px; word-break: keep-all; }
 .rec-list { margin: 0; padding: 0; list-style: none; }
 .rec-list li { padding: 3px 0; font-size: 14.5px; }
 .rec-list small { color: var(--ink-2); font-size: 12.5px; }
 .rec-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
 .rec-copied { color: #ffe08a; font-size: 13px; }
-.rec-source { margin: 10px 0 0; color: var(--ink-3); font-size: 12px; word-break: keep-all; }
 .records .fold { margin-top: 12px; }
+.records .fold + .fold { margin-top: 0; }
+.fold-small > summary { min-height: 40px; color: var(--ink-2); font-size: 13px; font-weight: 400; }
 
-/* 시간대별(달력에서 날짜를 누르면): 요약 · 24시간 띠 · 복사. 띠는 옆으로 밀어 보고, 왼쪽 이름표 칸은 밀리지 않는다.
+/* 시간대별 띠(그날 칸 안, 숫자 아래): 옆으로 밀어 보고, 왼쪽 이름표 칸은 밀리지 않는다.
    줄 높이는 records.js 의 HOUR_COL(칸 너비)·HOUR_CURVE(꺾은선 칸 높이)와 같게 */
-.hr { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-.hr-title { margin: 0; font-size: 15px; font-weight: 700; }
-.hr-title small { color: var(--ink-3); font-size: 12px; font-weight: 400; }
-.rec-fact.strong b { font-size: 18px; }
-.rec-fact.wide { grid-column: 1 / -1; }
-.hr .rec-fact:last-child { grid-column: auto; }
-.hr .rec-fact.wide:last-child { grid-column: 1 / -1; }
-.hr-strip { display: flex; margin-top: 12px; }
+.hr-strip { display: flex; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .hr-names, .hr-col { display: grid; flex: none; grid-template-rows: 20px 18px 54px 20px 22px 18px; align-items: center; }
 .hr-names { width: 66px; color: var(--ink-2); font-size: 11px; white-space: nowrap; }
-.hr-scroll { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.hr-scroll { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
 .hr-scroll::-webkit-scrollbar { display: none; }
 .hr-scroll:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 8px; }
 .hr-inner { position: relative; display: flex; }
-.hr-col { width: 46px; justify-items: center; font-variant-numeric: tabular-nums; }
+.hr-col { width: 46px; justify-items: center; font-variant-numeric: tabular-nums; scroll-snap-align: start; }
 .hr-hour { color: var(--ink-2); font-size: 12px; }
 .hr-wet { max-width: 100%; overflow: hidden; color: var(--series-1); font-size: 11px; white-space: nowrap; }
 .hr-temp { color: var(--ink-2); font-size: 12.5px; white-space: nowrap; }
@@ -1264,6 +1267,8 @@ body.home .records h2 { margin: 0 0 8px; font-size: 17px; }
 .hr-col.peak { border-radius: 10px; background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55); }
 .hr-col.none .hr-hour { opacity: 0.45; }
 .hr-chart { position: absolute; top: 38px; left: 0; overflow: visible; pointer-events: none; }
+.hr-strip.dry .hr-names, .hr-strip.dry .hr-col { grid-template-rows: 20px 54px 20px 22px 18px; }
+.hr-strip.dry .hr-chart { top: 20px; }
 .hr-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .hr-line.temp { stroke: rgba(255, 255, 255, 0.55); }
 .hr-line.feel { stroke: var(--series-1); stroke-dasharray: 5 4; }
@@ -1271,7 +1276,6 @@ body.home .records h2 { margin: 0 0 8px; font-size: 17px; }
 .hr-dot.feel { fill: var(--series-1); }
 .hr-key { display: inline-block; width: 14px; margin-right: 4px; border-top: 2px solid rgba(255, 255, 255, 0.55); vertical-align: middle; }
 .hr-key.feel { border-top: 2px dashed var(--series-1); }
-.hr .skeleton { margin-top: 10px; }
 /* 예보 띠(날씨 칸): 체감온도가 기온과 다른 시간대가 있으면 기온 아래에 한 줄을 더 둔다 */
 .strip-feel { display: none; color: var(--series-1); font-size: 10.5px; white-space: nowrap; }
 .strip.has-feel .strip-col { grid-template-rows: 16px 20px 28px 16px 52px 16px; }

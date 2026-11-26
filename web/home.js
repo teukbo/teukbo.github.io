@@ -390,8 +390,8 @@
         columns));
   }
 
-  /** 날씨 카드: 비·눈·기온·바람 한 줄씩과 시간대별 줄 */
-  function renderWeather(region) {
+  /** 날씨 카드: 비·눈·기온·바람 한 줄씩과 시간대별 줄. tail: 카드 끝에 붙일 것(해당하는 단계가 없는 날의 접힌 작업 기준 — renderWork) */
+  function renderWeather(region, tail) {
     const doc = detailOf(region);
     if (!doc) return null;
     const box = h("section", { class: "glass weather", "aria-label": "날씨" });
@@ -401,11 +401,12 @@
     if (w.rain) lines.push(h("li", null, h("span", { class: "name", text: "비" }), h("b", { text: rainText(w, true) }), w.rain.wet ? h("small", null, `예보 ${w.rain.models}개 중 ${w.rain.wet}개가 비 예상`) : null));
     if (w.snow && w.snow.wet) lines.push(h("li", null, h("span", { class: "name", text: "눈" }), h("b", { text: `최대 ${mm(w.snow.max)}cm` }), h("small", null, `예보 ${w.snow.models}개 중 ${w.snow.wet}개가 눈 예상(24시간 신적설)`)));
     if (w.tempMin && w.tempMax) lines.push(h("li", null, h("span", { class: "name", text: "기온" }), h("b", { text: `${Math.round(w.tempMin.v)}~${Math.round(w.tempMax.v)}℃` }), h("small", null, `최저 ${whenText(w.tempMin.t)} · 최고 ${whenText(w.tempMax.t)}`)));
-    if (w.feelMin && w.feelMax) lines.push(h("li", null, h("span", { class: "name", text: "체감" }), h("b", { text: `${Math.round(w.feelMin.v)}~${Math.round(w.feelMax.v)}℃` }), h("small", null, `가장 낮을 때 ${whenText(w.feelMin.t)} · 가장 높을 때 ${whenText(w.feelMax.t)}`)));
+    if (w.feelMin && w.feelMax) lines.push(h("li", null, h("span", { class: "name", text: "체감" }), h("b", { text: `${Math.round(w.feelMin.v)}~${Math.round(w.feelMax.v)}℃` }), h("small", null, `최저 ${whenText(w.feelMin.t)} · 최고 ${whenText(w.feelMax.t)}`)));
     if (w.wind) lines.push(h("li", null, h("span", { class: "name", text: "바람" }), h("b", { text: `최대 ${Math.round(w.wind.v)}m/s` }), h("small", null, `${whenText(w.wind.t)}${w.gust ? ` · 순간 ${Math.round(w.gust.v)}m/s` : ""}`)));
     if (!lines.length) return null;
     if (w.blocks.length) box.append(hourStrip(w));
     box.append(h("ul", { class: "weather-lines" }, lines));
+    if (tail) box.append(tail);
     return box;
   }
 
@@ -421,7 +422,10 @@
 
   /** 폭염·한파 때의 작업 기준. 기준(단계·문구·출처)은 모두 받아 온 자료(work_rules.json)에서 읽는다 — 화면 코드에 수치를 적지 않는다.
    *  단계는 두 가지 꼴이다: 체감온도가 얼마 이상/이하(min·max)이면 해당하는 것, 특보 단계(level)가 발효·예상되면 해당하는 것.
-   *  한파·폭염을 골랐으면 그 기준을 펼쳐서, 전체를 볼 때는 제철인 기준만 접어서 보여 준다. */
+   *  한파·폭염을 골랐으면 그 기준을, 전체를 볼 때는 제철인 기준을 보여 준다.
+   *  돌려주는 것: { card } 따로 두는 칸 — 눈여겨볼 단계가 있을 때(해당하는 단계가 있거나, 그 특보의 가능성이 '주의' 이상). 고른 종류면 펼쳐서, 전체를 볼 때는 접어서 제목에 단계를 적는다.
+   *             { tail } 날씨 칸 끝에 붙이는 접힌 한 줄 — 눈여겨볼 단계가 없을 때. 체감온도는 바로 위 날씨 칸에 있으므로 칸을 따로 차지하지 않는다(2026-11-26 간소화).
+   *  예보를 받는 중이고 눈여겨볼 단계도 없으면 아무것도 돌려주지 않는다(칸이 떴다가 접히며 화면이 출렁이지 않게 — 받은 뒤에 붙는다). */
   function renderWork(region) {
     const rules = state.work, doc = detailOf(region);
     if (!rules || !Array.isArray(rules.guides)) return null;
@@ -431,7 +435,7 @@
     const w = doc && doc !== "loading" ? weatherOf(doc) : null, metric = guide.metric || {}, unit = metric.unit || "℃";
     const extreme = w ? (metric.stat === "min" ? w.feelMin : w.feelMax) : null, sm = typeSummary(region, guide.type);
     const kindName = (kind) => (rules.kinds || {})[kind] || kind || "";
-    let reached = null;  // 지금 예보로 해당하는 가장 높은 단계
+    let reached = null, near = null;  // 지금 예보로 해당하는 가장 높은 단계 · 해당하지는 않지만 가능성이 '주의' 이상인 가장 높은 단계([단계, 덧붙일 말])
     const stages = (guide.stages || []).map((stage) => {
       let state_ = "", note = "";
       if (stage.level) {
@@ -446,6 +450,7 @@
         if (hit.length) { state_ = "on"; note = `해당 예상 · ${hourRanges(w.times, hit)}`; }
       }
       if (state_ === "on") reached = stage;
+      if (state_ === "near") near = [stage, note];
       const label = stage.level ? stage.name : `${metric.label || "체감온도"} ${stage.min != null ? `${stage.min}${unit} 이상` : `${stage.max}${unit} 이하`}`;
       return h("li", { class: `stage${state_ ? ` ${state_}` : ""}` },
         h("p", { class: "stage-key" }, h("b", { text: label }), stage.kind ? h("span", { class: `kind k-${stage.kind}`, text: kindName(stage.kind) }) : null, note ? h("span", { class: "stage-note", text: note }) : null),
@@ -464,15 +469,22 @@
         guide.note ? h("p", { class: "work-basics", text: guide.note }) : null,
         h("ul", { class: "fold-notes" }, (guide.stages || []).filter((stage) => stage.basis).map((stage) => h("li", null, h("b", { text: `${stageLabel(stage)}(${kindName(stage.kind)}) ` }), stage.basis))),
         h("p", { class: "work-source" }, rules.notice ? `${rules.notice} ` : null, (guide.sources || []).map((src, k) => [k ? " · " : "출처: ", src.url ? h("a", { href: src.url, rel: "noopener", text: src.name }) : src.name]), rules.checked_at ? ` (${rules.checked_at} 확인)` : null))];
-    const box = h("section", { class: "glass work", "aria-label": guide.title });
-    if (state.type) return put(box, h("p", { class: "glass-title" }, guide.title, guide.subtitle ? h("small", null, ` ${guide.subtitle}`) : null), body);
+    const notable = Boolean(reached || near);
+    if (!notable && doc === "loading") return null;
     // 접어 둔 채로도 지금 어느 단계인지는 제목에서 보이게
-    return put(box, fold(`work-${guide.id}`, `${guide.title}${w ? ` — ${reached ? `${stageLabel(reached)} 단계` : "해당 단계 없음"}` : ""}`, body));
+    const where = reached ? `${stageLabel(reached)} 단계` : near ? `${stageLabel(near[0])} ${near[1]}` : w ? "해당 단계 없음" : "";
+    const folded = () => fold(`work-${guide.id}`, `${guide.title}${where ? ` — ${where}` : ""}`, body);
+    if (!notable && w) return { tail: h("div", { class: "work work-tail", role: "group", "aria-label": guide.title }, folded()) };
+    const box = h("section", { class: "glass work", "aria-label": guide.title });
+    if (state.type && notable) return { card: put(box, h("p", { class: "glass-title" }, guide.title, guide.subtitle ? h("small", null, ` ${guide.subtitle}`) : null), body) };
+    return { card: put(box, folded()) };
   }
 
   /** 시간별 예보에 기대는 칸(날씨 한 줄 · 작업 기준 · 날씨)을 채운다. 가능성의 머리는 건드리지 않는다. animate: 새로 나타나게. */
   function fillWeather(region, animate) {
-    const slots = [["nowline", nowLine(region)], ["work", renderWork(region)], ["weather", renderWeather(region)]];
+    const work = renderWork(region) || {}, weather = renderWeather(region, work.tail);
+    // 날씨 칸을 그리지 못한 때(요약할 예보가 없음)에는 접힌 작업 기준을 제 칸에 둔다
+    const slots = [["nowline", nowLine(region)], ["work", work.card || (!weather && work.tail ? h("section", { class: "glass work" }, work.tail) : null)], ["weather", weather]];
     for (const [id, node] of slots) {
       const slot = $(id);
       if (!slot) continue;

@@ -328,7 +328,7 @@ class HoursTest(unittest.TestCase):
         obs.save_rows(self.dir, "258", "보성군", [obs_row(date(2026, 11, 25), temp_min=-1.0, temp_max=5.0)])
         docs = {d["id"]: d for d in records.build_all(CFG, self.dir, STATIONS)}
         doc = docs["beolgyo"]
-        self.assertEqual(doc["hours"], {"from": "2026-11-25", "to": "2026-11-26"})
+        self.assertEqual(doc["hours"], {"from": "2026-11-25", "to": "2026-11-26", "source": records.HOURS_SOURCE})  # 출처 글은 화면이 그대로 적는다
         self.assertEqual(sorted(doc["days"]["2026-11-25"]), ["h", "o"])  # 16시각뿐이라 그날의 체감 최저·최고는 없다
         self.assertEqual(doc["days"]["2026-11-25"]["h"], 16)
         self.assertEqual(sorted(doc["days"]["2026-11-26"]), ["f", "h"])  # 관측소 일자료가 아직 없어도 시간별 값만으로 날을 싣는다

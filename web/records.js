@@ -3,8 +3,9 @@
  * 자료: data/records/<지역>.json (teukbo/records.py 가 배포 때 만든다)
  *   days["2026-11-18"] = { o: [vars 순서의 관측값…], w: [[종류, 단계, 발효 시각, 해제 시각|null], …], h: 시간별 값이 있는 시각 수, f: [체감 최저, 시, 체감 최고, 시] }
  *   관측(o)은 가까운 기상청 관측소의 일자료(전날 것이 다음 날 오전에 들어온다), 특보는 기상청 발표·해제 이력.
- * 날짜를 누르면 그 달의 시간별 파일 data/hours/<지역>/<연-월>.json 을 그때 받아 '시간대별' 칸을 그린다(기상청 초단기실황 — 그 지역 격자의 정시 값).
- *   체감온도는 서버가 기상청 식으로 계산해 실어 준 값을 그대로 쓴다(화면에서 다시 계산하지 않는다). 하루 관측값(관측소)과는 지점이 달라 칸을 따로 둔다.
+ * 날짜를 누르면 그날 칸이 달력 아래에 뜬다: 특보 · 그날의 숫자 몇 개(체감·기온·강수·바람) · 시간대별 띠를 한 덩어리로(하루 값 칸과 시간대별 칸을 따로 두지 않는다).
+ *   시간대별 값은 그 달의 파일 data/hours/<지역>/<연-월>.json 을 그때 받아 그린다(기상청 초단기실황 — 그 지역 격자의 정시 값).
+ *   체감온도는 서버가 기상청 식으로 계산해 실어 준 값을 그대로 쓴다(화면에서 다시 계산하지 않는다). 하루 값(관측소)과는 지점이 다르다 — 출처와 기간은 맨 아래 접힌 칸에 모아 적는다.
  * 첫 화면(home.js)이 고른 지역과 특보 종류를 넘겨 준다. 종류를 고르면 그 종류의 특보만 표시하고, 달력 칸의 숫자도 그 종류에 맞는 값으로 바뀐다
  * (한파 → 최저기온, 호우 → 강수량, 강풍 → 순간풍속 …). 종류·단계의 이름은 받아 온 자료(types·levels)에서 읽는다.
  * 원칙: 받아 온 글은 늘 텍스트로 넣는다. 값이 없으면 지어내지 않고 '–' 로 적는다.
@@ -24,6 +25,7 @@ window.TeukboRecords = (() => {
   const view = { want: null, region: null, month: null, day: null, type: undefined, copied: null, strip: { key: "", left: null } };  // want: 지금 그리려는 지역  // 보고 있는 달·고른 날(지역이나 종류가 바뀌면 다시 잡는다)
 
   const put = (node, ...kids) => { node.append(...kids.flat(Infinity).filter((kid) => kid != null && kid !== false)); return node; };
+  const small = (node) => { node.classList.add("fold-small"); return node; };  // 접힌 칸의 제목을 작고 옅게(출처처럼 늘 눌러 볼 것은 아닌 칸)
   const pad = (n) => String(n).padStart(2, "0");
   const fmt = (v, digits = 1) => (v == null ? "–" : Number(v).toFixed(digits).replace(/\.0$/, "").replace("-", "−"));
   const weekday = (ymd) => { const [y, m, d] = ymd.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); };
@@ -147,9 +149,10 @@ window.TeukboRecords = (() => {
   }
 
   /** 24시간 띠: 칸마다 시각 · 강수 · (기온·체감 꺾은선) · 기온 · 체감 · 바람. 왼쪽 이름표 칸은 옆으로 밀어도 제자리에 있다.
-   *  값이 없는 시각은 칸을 비우고, 꺾은선도 거기서 끊는다(없는 값을 이어 그리지 않는다). 눈여겨볼 시각(peak)은 칸을 도드라지게 한다. */
+   *  값이 없는 시각은 칸을 비우고, 꺾은선도 거기서 끊는다(없는 값을 이어 그리지 않는다). 눈여겨볼 시각(peak)은 칸을 도드라지게 한다.
+   *  비·눈이 한 시각도 없던 날은 강수 줄을 두지 않는다(늘 비어 있는 줄을 그리지 않는다 — style.css 의 .hr-strip.dry). */
   function hourStrip(rows, peak, label, key) {
-    const byHour = new Map(rows.map((r) => [r.hour, r]));
+    const byHour = new Map(rows.map((r) => [r.hour, r])), wet = rows.some(isWet);
     const all = rows.flatMap((r) => [r.temp, r.feel]).filter((v) => v != null);
     const lo = Math.min(...all), span = Math.max(2, Math.max(...all) - lo);
     const y = (v) => 6 + (1 - (v - lo) / span) * (HOUR_CURVE - 12);
@@ -169,7 +172,7 @@ window.TeukboRecords = (() => {
       cols.push(h("div", { class: `hr-col${r ? "" : " none"}${r && r === peak ? " peak" : ""}`, title: said },
         h("span", { class: "sr-only", text: said }),
         seen("hr-hour", `${pad(hour)}시`),
-        seen("hr-wet", r && isWet(r) ? (r.rain ? fmt(r.rain) : "·") : ""),  // 양만 적는다(형태 이름은 길어 칸을 넘친다 — 위의 요약과 title 에 있다). 양이 0 인 강수는 점 하나
+        wet ? seen("hr-wet", r && isWet(r) ? (r.rain ? fmt(r.rain) : "·") : "") : null,  // 양만 적는다(형태 이름은 길어 칸을 넘친다 — 위의 숫자 칸과 title 에 있다). 양이 0 인 강수는 점 하나
         seen("hr-lines", ""),
         seen("hr-temp", num(r, "temp", "")),
         seen("hr-feel", num(r, "feel", "")),
@@ -179,80 +182,89 @@ window.TeukboRecords = (() => {
       h("div", { class: "hr-inner", style: `width:${24 * HOUR_COL}px` },
         s("svg", { class: "hr-chart", width: String(24 * HOUR_COL), height: String(HOUR_CURVE), viewBox: `0 0 ${24 * HOUR_COL} ${HOUR_CURVE}`, "aria-hidden": "true" }, lines("temp"), lines("feel")),
         cols));
-    const strip = h("div", { class: "hr-strip", role: "group", "aria-label": label },
-      h("div", { class: "hr-names", "aria-hidden": "true" }, h("span", { text: "시각" }), h("span", { text: "강수(mm)" }), h("span", { class: "hr-lines" }),
+    const strip = h("div", { class: `hr-strip${wet ? "" : " dry"}`, role: "group", "aria-label": label },
+      h("div", { class: "hr-names", "aria-hidden": "true" }, h("span", { text: "시각" }), wet ? h("span", { text: "강수(mm)" }) : null, h("span", { class: "hr-lines" }),
         h("span", null, h("i", { class: "hr-key temp" }), "기온(℃)"), h("span", null, h("i", { class: "hr-key feel" }), "체감(℃)"), h("span", { text: "바람(m/s)" })),
       scroller);
     // 옆으로 민 자리는 다시 그려도 그대로 둔다. 그 날을 처음 그릴 때는 눈여겨볼 시각이 가운데 오게 옮긴다
     scroller.addEventListener("scroll", () => { if (view.strip.key === key) view.strip.left = scroller.scrollLeft; }, { passive: true });
     const settle = () => {
       if (!scroller.isConnected) return;
+      // 맨 끝까지 밀어도 왼쪽 끝이 칸 경계에 오게, 보이는 너비가 칸 너비의 배수가 아닌 만큼 끝에 빈자리를 둔다(끝 시각을 볼 때 왼쪽 글자가 잘리지 않게)
+      scroller.firstChild.style.width = `${24 * HOUR_COL + (HOUR_COL - (scroller.clientWidth % HOUR_COL)) % HOUR_COL}px`;
       if (view.strip.key === key && view.strip.left != null) { scroller.scrollLeft = view.strip.left; return; }
       view.strip = { key, left: null };
-      scroller.scrollLeft = Math.max(0, (peak ? peak.hour : 0) * HOUR_COL + HOUR_COL / 2 - scroller.clientWidth / 2);
+      scroller.scrollLeft = Math.max(0, Math.round(((peak ? peak.hour : 0) * HOUR_COL + HOUR_COL / 2 - scroller.clientWidth / 2) / HOUR_COL) * HOUR_COL);  // 칸 경계에 맞춘다(왼쪽 끝에서 글자가 잘리지 않게)
       view.strip.left = scroller.scrollLeft;
     };
     (window.requestAnimationFrame || setTimeout)(settle);
     return strip;
   }
 
-  /** 날짜를 누르면 그 아래에 뜨는 '시간대별' 칸. 시간별 값이 없는 날은 언제부터 모으는지만 적는다.
-   *  그날의 체감 최저·최고는 서버가 실어 준 값(f)이 있을 때만 그대로 적는다 — 받은 시각이 모자란 날(수집 첫날, 오늘, 수집이 멈췄던 날)에
-   *  받은 시각만으로 '그날의 최저'를 내세우지 않는다. 그런 날은 '받은 시각 중'이라고 이름을 바꿔 적는다. */
-  function renderHours(doc, ctx) {
-    const ymd = view.day, day = doc.days[ymd] || {}, count = day.h || 0;
-    if (!count) return doc.hours && doc.hours.from ? h("p", { class: "rec-none", text: `이 날은 시간별 자료가 없습니다 — ${dayLabel(doc.hours.from)}부터 모읍니다.` }) : null;
-    const box = h("div", { class: "hr" }, h("p", { class: "hr-title" }, "시간대별", h("small", null, ` 값이 있는 시각 ${count}개`)));
-    const hdoc = loadHours(doc.id, ymd.slice(0, 7), ctx);
-    if (hdoc === "loading") return put(box, h("div", { class: "skeleton", role: "status", "aria-label": "시간대별 값을 불러오는 중" }, h("span"), h("span")));
-    const rows = hdoc ? hourRows(hdoc, ymd) : [];
-    if (!rows.length) return put(box, h("p", { class: "rec-none", text: "시간대별 값을 불러오지 못했습니다. 날짜를 다시 눌러 보세요." }));
-    const low = hdoc.feel_stat !== "max";  // 겨울철 식을 쓰는 달은 가장 낮은 체감온도, 여름철 식을 쓰는 달은 가장 높은 체감온도를 앞세운다
-    const fact = (label, value, kind) => h("div", { class: `rec-fact${kind ? ` ${kind}` : ""}` }, h("span", { text: label }), h("b", { text: value }));
-    const at = (hour) => rows.find((r) => r.hour === hour) || null;
+  /** 그날의 숫자들 → { tiles: 숫자 칸들, peak: 띠에서 도드라지게 할 시각, note: 덧붙일 한 줄(없으면 null) }.
+   *  어디서 오나: 최저·최고기온, 강수량, 바람은 관측소 일자료(o). 그것이 없는 날(오늘, 관측소가 없는 지역)은 받은 시간별 값으로 적고, 그렇다고 한 줄(note)로 밝힌다.
+   *  체감온도는 시간별 값에서만 나온다. 그날 전체의 체감 최저·최고는 서버가 실어 준 값(f)이 있을 때만 그대로 적는다 — 받은 시각이 모자란 날
+   *  (수집 첫날, 오늘, 수집이 멈췄던 날)에 받은 시각만으로 '그날의 최저'를 내세우지 않고, 이름에 '(N시간 중)'을 붙인다. */
+  function dayFacts(doc, ymd, rows, hdoc) {
+    const day = doc.days[ymd] || {}, daily = Boolean(day.o), v = (name) => valueOf(doc, ymd, name);
+    const low = !hdoc || hdoc.feel_stat !== "max";  // 겨울철 식을 쓰는 달은 가장 낮은 체감온도, 여름철 식을 쓰는 달은 가장 높은 체감온도를 적는다
     const whole = Array.isArray(day.f) && day.f.length === 4;  // 그날 전체의 값으로 볼 수 있는가
-    let peak, feels;
-    if (whole) {
-      const [lo, loHour, hi, hiHour] = day.f, a = ["체감 최저", lo, loHour], b = ["체감 최고", hi, hiHour], [lead, rest] = low ? [a, b] : [b, a];
-      peak = at(lead[2]);
-      feels = [fact(lead[0], `${fmt(lead[1])}℃ · ${pad(lead[2])}시`, "strong"), fact(rest[0], `${fmt(rest[1])}℃ · ${pad(rest[2])}시`)];
-    } else {
-      const got = extreme(rows, "feel", low ? -1 : 1);
-      peak = got || extreme(rows, "temp", low ? -1 : 1);
-      feels = [got ? fact(`받은 시각 중 가장 ${low ? "낮은" : "높은"} 체감`, `${fmt(got.feel)}℃ · ${pad(got.hour)}시`, "wide") : null];
+    // 칸 하나: 이름 아래에 값. 이름 뒤에 덧붙는 말(more)은 좁은 화면에서 한 덩이로 줄이 바뀌고, 값 옆의 작은 글(tail)은 넓은 칸에서만 쓴다
+    const tile = (label, value, kind, more, tail) => h("div", { class: `rec-fact${kind ? ` ${kind}` : ""}` }, h("span", null, label, more ? h("i", { text: ` ${more}` }) : null), h("b", null, value, tail ? h("small", { text: ` ${tail}` }) : null));
+    const tiles = [];
+    let peak = null;
+    if (rows.length) {
+      const name = `체감 ${low ? "최저" : "최고"}`;
+      if (whole) {
+        const [lo, loHour, hi, hiHour] = day.f, [value, at] = low ? [lo, loHour] : [hi, hiHour];
+        peak = rows.find((r) => r.hour === at) || null;
+        tiles.push(tile(`${name} · ${pad(at)}시`, `${fmt(value)}℃`, "strong"));
+      } else {
+        const got = extreme(rows, "feel", low ? -1 : 1);
+        peak = got || extreme(rows, "temp", low ? -1 : 1);
+        if (got) tiles.push(tile(`${name} · ${pad(got.hour)}시`, `${fmt(got.feel)}℃`, "strong", `(${rows.length}시간 중)`));
+      }
     }
-    const tLow = extreme(rows, "temp", -1), tHigh = extreme(rows, "temp", 1);
+    if (daily) tiles.push(tile("최저기온", `${fmt(v("temp_min"))}℃`), tile("최고기온", `${fmt(v("temp_max"))}℃`));
+    else { const a = extreme(rows, "temp", -1), b = extreme(rows, "temp", 1); if (a && b) tiles.push(tile("기온 최저", `${fmt(a.temp)}℃`), tile("기온 최고", `${fmt(b.temp)}℃`)); }
     const kinds = new Map();  // 강수형태 이름 → 그 형태였던 시각들(비·눈이 섞인 날을 한 이름으로 뭉뚱그리지 않는다)
     for (const r of rows.filter(isWet)) { const name = wetName(r.pty); if (!kinds.has(name)) kinds.set(name, []); kinds.get(name).push(r.hour); }
-    const facts = [...feels,
-      tLow && tHigh ? fact(whole ? "기온" : "받은 시각의 기온", `${fmt(tLow.temp)}℃(${pad(tLow.hour)}시) ~ ${fmt(tHigh.temp)}℃(${pad(tHigh.hour)}시)`, "wide") : null,
-      kinds.size ? fact("강수", [...kinds].map(([name, hours]) => (kinds.size === 1 && name === "강수" ? hourSpans(hours) : `${name} ${hourSpans(hours)}`)).join(" · "), "wide") : null].filter(Boolean);
-    const label = `${dayLabel(ymd)} 시간대별. ${facts.map((node) => `${node.firstChild.textContent} ${node.lastChild.textContent}`).join(", ")}`;
-    const where = `day|${ymd}`;
-    return put(box,
-      h("div", { class: "rec-facts" }, facts),
-      whole ? null : h("p", { class: "rec-none", text: "받은 시각이 모자라 그날 전체의 체감 최저·최고는 적지 않습니다." }),
-      hourStrip(rows, peak, label, `${doc.id}|${ymd}`),
-      h("div", { class: "rec-foot" }, h("button", { type: "button", class: "chip", "data-focus": "copy-day", onclick: () => copyText(dayTable(rows, ymd), ctx.again, where) }, "이 날 시간별 표 복사(엑셀용)"),
-        view.copied && view.copied.where === where ? h("span", { class: "rec-copied", role: "status", text: view.copied.text }) : null),
-      h("p", { class: "rec-source", text: `시간별: ${hdoc.source || "기상청 초단기실황"}. 관측소 값과 다를 수 있습니다.` }));
+    const when = [...kinds].map(([name, hours]) => (kinds.size === 1 && name === "강수" ? hourSpans(hours) : `${name} ${hourSpans(hours)}`)).join(" · ");
+    const rain = daily ? v("rain") : rows.reduce((sum, r) => (r.rain == null ? sum : (sum || 0) + r.rain), null);
+    if (daily || rain != null || when) tiles.push(tile("강수량", rain == null ? "–" : `${fmt(rain)}mm`, when ? "wide" : "", null, when));
+    if (daily && v("snow_new")) tiles.push(tile("새로 쌓인 눈", `${fmt(v("snow_new"))}cm`));
+    if (daily) { if (v("wind_max") != null) tiles.push(tile("최대풍속", `${fmt(v("wind_max"))}m/s`)); if (v("gust_max") != null) tiles.push(tile("순간풍속", `${fmt(v("gust_max"))}m/s`)); }
+    else { const w = extreme(rows, "wind", 1); if (w) tiles.push(tile("바람 최대", `${fmt(w.wind)}m/s`)); }
+
+    const since = doc.hours && doc.hours.from;
+    const note = day.h && !rows.length ? "시간대별 값을 불러오지 못했습니다. 날짜를 다시 눌러 보세요."
+      : !tiles.length ? "이 날의 관측값은 아직 없습니다."
+      : !rows.length ? (since && ymd < since ? `시간대별 값은 ${dayLabel(since)}부터 있습니다.` : since ? "이 날은 시간대별 값을 받지 못했습니다." : null)
+      : !daily ? `${whole ? "시간대별 값" : `받은 ${rows.length}시간`} 기준입니다(${doc.station ? "하루 값은 아직 없음" : "가까운 관측소 없음"}).`
+      : !whole ? `시간대별 값은 ${rows.length}시간치만 있습니다.` : null;
+    return { tiles, peak, note };
   }
 
+  /** 날짜를 누르면 그 아래에 뜨는 그날 칸: 날짜와 특보 → 그날의 숫자 → 시간대별 띠 → 표 복사. 한 덩어리로 그린다.
+   *  출처와 기간은 이 칸에 적지 않는다(기록 칸 맨 아래의 접힌 '자료' 칸에 모았다). */
   function renderDay(doc, ctx) {
-    const ymd = view.day, warns = warningsOn(doc, ymd, ctx), v = (name) => valueOf(doc, ymd, name), has = Boolean((doc.days[ymd] || {}).o);
-    const item = (label, value) => h("div", { class: "rec-fact" }, h("span", { text: label }), h("b", { text: value }));
-    // 하루 관측값(관측소)과 시간대별 값(지역 격자)은 지점이 달라 칸을 따로 둔다. 체감온도는 시간대별 칸에서만 적는다.
-    return h("div", { class: "rec-day" },
-      h("p", { class: "rec-day-title", text: dayLabel(ymd) }),
+    const ymd = view.day, count = (doc.days[ymd] || {}).h || 0, warns = warningsOn(doc, ymd, ctx);
+    const box = h("div", { class: "rec-day" },
+      h("div", { class: "rec-day-head" }, h("p", { class: "rec-day-title", text: dayLabel(ymd) }),
+        warns.length ? null : h("span", { class: "rec-quiet", text: !warnKnown(doc, ymd) ? "특보 이력 아직 없음" : `${ctx.type ? typeName(ctx, ctx.type) : ""}특보 없음` })),
       warns.length ? h("ul", { class: "rec-warns" }, warns.map((w) => h("li", null, h("span", { class: `rec-tag lv-${w[1]}`, text: levelName(ctx, w[1]) }), h("b", { text: ` ${warnName(ctx, w)}` }),
-        h("small", null, ` ${clock(w[2])} ~ ${w[3] ? `${clock(w[3])} · ${hoursBetween(w[2], w[3])}시간` : "계속"}`))))
-        : h("p", { class: "rec-none", text: !warnKnown(doc, ymd) ? "이 날의 특보 이력은 아직 받지 못했습니다." : ctx.type ? `이 날은 ${typeName(ctx, ctx.type)}특보가 없었습니다.` : "이 날은 특보가 없었습니다." }),
-      has ? h("div", { class: "rec-facts" }, item("최저기온", `${fmt(v("temp_min"))}℃`), item("최고기온", `${fmt(v("temp_max"))}℃`),
-        item("강수량", v("rain") == null ? "–" : `${fmt(v("rain"))}mm`), v("snow_new") ? item("새로 쌓인 눈", `${fmt(v("snow_new"))}cm`) : null,
-        item("바람", v("wind_max") == null ? "–" : `최대 ${fmt(v("wind_max"))}m/s${v("gust_max") == null ? "" : ` · 순간 ${fmt(v("gust_max"))}m/s`}`))
-        : h("p", { class: "rec-none", text: doc.station ? "이 날의 관측소 값은 아직 들어오지 않았습니다(전날 것이 다음 날 오전에 들어옵니다)." : "가까운 관측소가 없어 관측소 값은 싣지 못했습니다." }),
-      has && doc.station ? h("p", { class: "rec-source", text: `하루 값: 기상청 ${doc.station.name} 관측소(약 ${fmt(doc.station.km, 0)}km)` }) : null,
-      renderHours(doc, ctx));
+        h("small", null, ` ${clock(w[2])} ~ ${w[3] ? `${clock(w[3])} · ${hoursBetween(w[2], w[3])}시간` : "계속"}`)))) : null);
+    const hdoc = count ? loadHours(doc.id, ymd.slice(0, 7), ctx) : null;  // 시간별 값이 있는 날에만 그 달 파일을 받는다
+    if (hdoc === "loading") return put(box, h("div", { class: "skeleton", role: "status", "aria-label": "그날 값을 불러오는 중" }, h("span"), h("span"), h("span")));
+    const rows = hdoc ? hourRows(hdoc, ymd) : [];
+    const { tiles, peak, note } = dayFacts(doc, ymd, rows, hdoc);
+    put(box, tiles.length ? h("div", { class: "rec-facts" }, tiles) : null, note ? h("p", { class: "rec-note", text: note }) : null);
+    if (!rows.length) return box;
+    const where = `day|${ymd}`, said = tiles.map((node) => `${node.firstChild.textContent} ${node.lastChild.textContent}`).join(", ");
+    return put(box,
+      hourStrip(rows, peak, `${dayLabel(ymd)} 시간대별. ${said}`, `${doc.id}|${ymd}`),
+      h("div", { class: "rec-foot" }, h("button", { type: "button", class: "chip", "data-focus": "copy-day", onclick: () => copyText(dayTable(rows, ymd), ctx.again, where) }, "이 날 시간별 표 복사"),
+        view.copied && view.copied.where === where ? h("span", { class: "rec-copied", role: "status", text: view.copied.text }) : null));
   }
 
   /** 기록 칸을 그린다. ctx: { region: {id, name}|null, type: 종류 id|null, types, levels, again: 다시 그리기, fresh: 지역·종류가 바뀐 첫 그림인지 } */
@@ -314,14 +326,20 @@ window.TeukboRecords = (() => {
       h("p", { class: "rec-key" }, order.slice().reverse().filter((id) => list.some((e) => e.w[1] === id) || id === "advisory").map((id) => h("span", null, h("i", { class: `rec-swatch lv-${id}` }), levelName(ctx, id))),
         doc.hours ? h("span", null, h("i", { class: "cal-dot key" }), "시간대별 값 있음") : null,
         h("span", { text: `칸의 숫자: ${!ctx.type ? "최저/최고기온(℃)" : [...shown].join(" 또는 ") || "관측값"}` })),
-      view.day ? renderDay(doc, ctx) : h("p", { class: "rec-none", text: doc.hours ? "날짜를 누르면 그날의 특보·관측값과 시간대별 체감온도를 보여 줍니다." : "날짜를 누르면 그날의 특보와 관측값을 보여 줍니다." }),
+      view.day ? renderDay(doc, ctx) : h("p", { class: "rec-none", text: doc.hours ? "날짜를 누르면 그날 날씨와 시간대별 체감온도가 뜹니다." : "날짜를 누르면 그날의 특보와 날씨가 뜹니다." }),
+      h("div", { class: "rec-foot" },
+        h("button", { type: "button", class: "chip", "data-focus": "copy-month", onclick: () => copyText(monthTable(doc, ctx, span), ctx.again, where) }, "이 달 표 복사"),
+        view.copied && view.copied.where === where ? h("span", { class: "rec-copied", role: "status", text: view.copied.text }) : null),
       list.length ? ctx.fold("rec-list", `${scope} 발효 기록 모두 보기 (${list.length}건)`, h("ul", { class: "rec-list" }, list.map((e) => h("li", null,
         h("button", { type: "button", class: "linklike", "data-focus": `ep:${e.w[0]}|${e.w[1]}|${e.w[2]}`, onclick: () => { view.month = e.first.slice(0, 7); view.day = e.first; view.slide = true; ctx.again(); } }, `${dayLabel(e.first)} ${warnName(ctx, e.w)}`),
         h("small", null, ` ${clock(e.w[2])} ~ ${e.w[3] ? clock(e.w[3]) : "계속"}`))))) : null,
-      h("div", { class: "rec-foot" },
-        h("button", { type: "button", class: "chip", "data-focus": "copy-month", onclick: () => copyText(monthTable(doc, ctx, span), ctx.again, where) }, "이 달 표 복사(엑셀용)"),
-        view.copied && view.copied.where === where ? h("span", { class: "rec-copied", role: "status", text: view.copied.text }) : null),
-      h("p", { class: "rec-source", text: `${doc.from ? `특보: 기상청 발표·해제 이력(${dayLabel(doc.from)}부터). ` : ""}${doc.station ? `하루 값: 기상청 ${doc.station.name} 관측소(약 ${fmt(doc.station.km, 0)}km) 일자료${doc.obs_to ? ` · ${dayLabel(doc.obs_to)}까지` : ""}.` : "가까운 관측소가 없어 하루 관측값은 없습니다."}${doc.hours ? ` 시간별: 기상청 초단기실황 · ${dayLabel(doc.hours.from)}부터.` : ""}` }));
+      // 출처와 기간은 여기 한 곳에만 적는다(그날 칸마다 되풀이하지 않는다). 접어 두어도 '자료: 기상청'은 보인다
+      small(ctx.fold("rec-src", "자료: 기상청 — 출처와 기간", h("ul", { class: "fold-notes" }, [
+        doc.from ? `특보: 기상청 발표·해제 이력 — ${dayLabel(doc.from)}부터.` : null,
+        doc.station ? `하루 값(최저·최고기온, 강수량, 바람): 기상청 ${doc.station.name} 관측소(약 ${fmt(doc.station.km, 0)}km) 일자료${doc.obs_to ? ` — ${dayLabel(doc.obs_to)}까지` : ""}. 전날 것이 다음 날 오전에 들어옵니다.` : "가까운 관측소가 없어 하루 값은 시간대별 값으로 적습니다.",
+        doc.hours ? `시간대별 값과 체감온도: ${doc.hours.source || "기상청 초단기실황"} — ${dayLabel(doc.hours.from)}부터.` : null,
+        doc.hours && doc.station ? "하루 값과 시간대별 값은 관측 지점이 달라 숫자가 조금 다를 수 있습니다." : null,
+      ].filter(Boolean).map((text) => h("li", { text }))))));
     if (held) { const again = [...box.querySelectorAll("[data-focus]")].find((node) => node.getAttribute("data-focus") === held); if (again && !again.disabled) again.focus({ preventScroll: true }); }
   }
 

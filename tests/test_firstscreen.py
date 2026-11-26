@@ -126,6 +126,24 @@ class WorkRulesTest(unittest.TestCase):
         site = (ROOT / "teukbo" / "site.py").read_text(encoding="utf-8")
         self.assertIn('site_data / "work_rules.json"', site)  # 배포 때 화면이 읽는 자리로 복사된다
 
+    def test_work_card_folds_into_the_weather_card_when_nothing_applies(self):
+        # 간소화(2026-11-26): 눈여겨볼 단계가 없는 날에는 작업 기준이 칸을 따로 차지하지 않고 날씨 칸 끝의 접힌 한 줄이 된다
+        # (체감온도는 바로 위 날씨 칸에 있다). 해당하는 단계가 있거나 그 특보의 가능성이 '주의' 이상이면 전처럼 제 칸으로 보인다.
+        script, style = read("home.js"), read("style.css")
+        work = script[script.index("function renderWork(region)"):script.index("function fillWeather(")]
+        self.assertIn('if (state_ === "near") near = [stage, note];', work)
+        self.assertIn("const notable = Boolean(reached || near);", work)
+        self.assertIn('if (!notable && doc === "loading") return null;', work)  # 받는 중에는 칸을 띄웠다 접지 않는다
+        self.assertIn("if (!notable && w) return { tail:", work)
+        self.assertIn("if (state.type && notable) return { card:", work)  # 고른 종류에 눈여겨볼 단계가 있으면 펼쳐서
+        self.assertIn('"해당 단계 없음"', work)  # 접어 둔 채로도 제목에서 보인다
+        fill = script[script.index("function fillWeather(region, animate)"):script.index("/** 바탕 하늘")]
+        self.assertIn("weather = renderWeather(region, work.tail)", fill)
+        self.assertIn("!weather && work.tail", fill)  # 날씨 칸을 못 그린 때에는 제 칸에 둔다(사라지지 않게)
+        weather = script[script.index("function renderWeather(region, tail)"):script.index("// ------------------------------------------------------------ 작업 기준")]
+        self.assertIn("if (tail) box.append(tail);", weather)
+        self.assertIn(".weather > .work-tail {", style)
+
     def test_feel_temperature_series_reaches_the_screen(self):
         script = read("home.js")
         self.assertIn('mid("v:feel")', script)  # 체감온도는 서버가 계산해 싣는 계열을 읽는다(화면에서 식을 다시 계산하지 않는다)
@@ -166,27 +184,45 @@ class HoursScreenTest(unittest.TestCase):
     def test_day_panel_loads_the_month_file_when_a_day_has_hourly_values(self):
         script = read("records.js")
         self.assertIn("data/hours/${encodeURIComponent(id)}/${month}.json", script)
-        block = script[script.index("function renderHours(doc, ctx)"):script.index("function renderDay(doc, ctx)")]
-        self.assertIn("count = day.h || 0;", block)  # 값이 있는 날에만 받는다
-        self.assertLess(block.index("if (!count) return"), block.index("loadHours("))
-        self.assertIn("loadHours(doc.id, ymd.slice(0, 7), ctx)", block)  # 그 달 것을 그때 받고, 받으면 기록 칸만 다시 그린다
-        self.assertIn("doc.hours.from", block)  # 없는 날에는 언제부터 모으는지 적는다
-        self.assertIn("hdoc.source", block)  # 출처는 파일에 실린 글 그대로
-        self.assertIn("관측소 값과 다를 수 있습니다", block)
-        self.assertIn('"이 날 시간별 표 복사(엑셀용)"', block)
         day = script[script.index("function renderDay(doc, ctx)"):script.index("/** 기록 칸을 그린다.")]
-        self.assertIn("renderHours(doc, ctx)", day)
-        self.assertNotIn("feel", day)  # 하루 관측값 칸에는 체감온도를 적지 않는다(시간대별 칸에서만 — 지점이 다르다)
+        self.assertIn("count = (doc.days[ymd] || {}).h || 0", day)
+        self.assertIn("const hdoc = count ? loadHours(doc.id, ymd.slice(0, 7), ctx) : null;", day)  # 값이 있는 날에만, 그 달 것을 그때 받는다
+        self.assertIn("hourStrip(rows, peak,", day)
+        self.assertIn('"이 날 시간별 표 복사"', day)
+        facts = script[script.index("function dayFacts(doc, ymd, rows, hdoc)"):script.index("/** 날짜를 누르면 그 아래에 뜨는 그날 칸:")]
+        self.assertIn("doc.hours.from", facts)  # 시간별 값이 없는 날에는 언제부터 있는지 적는다
+        self.assertIn("이 날은 시간대별 값을 받지 못했습니다.", facts)  # 모으기 시작한 뒤의 빈 날은 그렇게 따로 적는다
+
+    def test_day_panel_is_one_block_and_sources_live_in_one_fold(self):
+        # 간소화(2026-11-26): 날짜를 누르면 하루 값 칸과 시간대별 칸이 따로 뜨던 것을 한 덩어리로 —
+        # 날짜·특보 → 그날의 숫자 한 묶음(체감·기온·강수·바람) → 시간대별 띠 → 표 복사. 출처·기간은 맨 아래 접힌 칸 한 곳에만.
+        script, style = read("records.js"), read("style.css")
+        self.assertEqual(script.count('class: "rec-facts"'), 1)  # 숫자 묶음은 하나
+        day = script[script.index("function dayFacts(doc, ymd, rows, hdoc)"):script.index("/** 기록 칸을 그린다.")]
+        self.assertLess(day.index('class: "rec-facts"'), day.index("hourStrip(rows, peak,"))  # 숫자 → 띠
+        for word in ("rec-source", "관측소(약", "초단기실황", "hr-title"):
+            self.assertNotIn(word, day, word)  # 그날 칸에는 출처·기간을 되풀이하지 않는다
+        body = script[script.index("  function render(box, ctx) {"):script.index("  return { render };")]
+        fold = body[body.index('ctx.fold("rec-src", "자료: 기상청'):]
+        for needle in ("doc.station.name", "doc.station.km", "doc.obs_to", "doc.hours.source", "doc.hours.from", "관측 지점이 달라"):
+            self.assertIn(needle, fold, needle)  # 출처 글은 자료에 실린 그대로, 지점이 다르다는 것도 여기서 밝힌다
+        self.assertIn('"source": HOURS_SOURCE', (ROOT / "teukbo" / "records.py").read_text(encoding="utf-8"))
+        for rule in (".hr-title", ".rec-source", ".hr {"):
+            self.assertNotIn(rule, style, rule)
+        self.assertIn(".rec-facts { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);", style)
+        # 하루 값(관측소)이 없는 날은 받은 시간별 값으로 적고, 그렇다고 밝힌다
+        self.assertIn('else { const a = extreme(rows, "temp", -1), b = extreme(rows, "temp", 1);', day)
+        self.assertIn("기준입니다(", day)
 
     def test_daily_feel_extremes_come_only_from_the_served_summary(self):
         # 받은 시각이 모자란 날(수집 첫날, 오늘, 수집이 멈췄던 날)에 받은 시각만으로 '그날의 체감 최저'를 내세우지 않는다:
-        # 서버가 실어 준 f 가 있을 때만 그 값·시각을 그대로 적고, 없으면 '받은 시각 중'이라고 이름을 바꾼다. 문턱 숫자는 화면에 없다.
+        # 서버가 실어 준 f 가 있을 때만 그 값·시각을 그대로 적고, 없으면 이름에 '(N시간 중)'을 붙인다. 문턱 숫자는 화면에 없다.
         script = read("records.js")
-        block = script[script.index("function renderHours(doc, ctx)"):script.index("function renderDay(doc, ctx)")]
+        block = script[script.index("function dayFacts(doc, ymd, rows, hdoc)"):script.index("/** 날짜를 누르면 그 아래에 뜨는 그날 칸:")]
         self.assertIn("Array.isArray(day.f) && day.f.length === 4", block)
         self.assertIn("const [lo, loHour, hi, hiHour] = day.f", block)
-        self.assertIn("받은 시각 중 가장", block)
-        self.assertIn("받은 시각이 모자라 그날 전체의 체감 최저·최고는 적지 않습니다.", block)
+        self.assertIn('"strong", `(${rows.length}시간 중)`', block)
+        self.assertIn("시간대별 값은 ${rows.length}시간치만 있습니다.", block)
         self.assertNotIn("feel_min_hours", script)
         self.assertNotRegex(block, r"[<>]=?\s*(19|20)\b")  # 20시각 문턱을 화면에서 다시 따지지 않는다
         self.assertIn("kinds.get(name).push(r.hour)", block)  # 강수는 형태 이름별로 시각을 묶는다(비·눈이 섞인 날을 한 이름으로 부르지 않는다)
@@ -197,7 +233,7 @@ class HoursScreenTest(unittest.TestCase):
         body = script[script.index("  function render(box, ctx) {"):script.index("  return { render };")]
         self.assertIn("inRange = ymd >= span.from && ymd <= span.to", body)  # 특보 이력이 늦거나 없어도 값이 있는 날은 누를 수 있다
         self.assertIn("monthsOf(span)", body)
-        self.assertIn("이 날의 특보 이력은 아직 받지 못했습니다.", script)  # '없음'과 '모름'을 가른다
+        self.assertIn('!warnKnown(doc, ymd) ? "특보 이력 아직 없음"', script)  # '없음'과 '모름'을 가른다
         self.assertIn("if (!warnKnown(doc, ymd)) continue;", body)  # 이 달의 특보 일수는 이력을 받아 둔 날만 센다
         self.assertIn('"이력 없음"', script)  # 복사한 표에서도 빈칸(= 특보 없음)과 구별된다
 
@@ -218,7 +254,7 @@ class HoursScreenTest(unittest.TestCase):
         self.assertIn("again.focus({ preventScroll: true })", body)
         for key in ('"data-focus": `day:${ymd}`', '"data-focus": "prev"', '"data-focus": "next"', '"data-focus": "copy-month"'):
             self.assertIn(key, body, key)
-        strip = script[script.index("function hourStrip(rows, peak, label, key)"):script.index("function renderHours(doc, ctx)")]
+        strip = script[script.index("function hourStrip(rows, peak, label, key)"):script.index("function dayFacts(doc, ymd, rows, hdoc)")]
         self.assertIn('h("span", { class: "sr-only", text: said })', strip)  # 칸마다 이름을 붙인 한 줄 글
         self.assertIn('"aria-hidden": "true", text })', strip)  # 보이는 숫자는 따로 읽지 않는다
         self.assertIn('role: "region"', strip)
@@ -242,8 +278,15 @@ class HoursScreenTest(unittest.TestCase):
         self.assertIn(".hr-col { width: 46px;", style)
         self.assertIn(".hr-names, .hr-col { display: grid; flex: none; grid-template-rows: 20px 18px 54px 20px 22px 18px;", style)
         self.assertIn(".hr-chart { position: absolute; top: 38px;", style)  # 시각(20) + 강수(18) 줄 아래가 꺾은선 자리
-        strip = script[script.index("function hourStrip(rows, peak, label, key)"):script.index("function renderHours(doc, ctx)")]
+        strip = script[script.index("function hourStrip(rows, peak, label, key)"):script.index("function dayFacts(doc, ymd, rows, hdoc)")]
         self.assertIn("r.hour === last[last.length - 1].hour + 1", strip)  # 이어진 시각끼리만 선으로 잇는다(빈 시각을 건너 잇지 않는다)
+        # 비·눈이 한 시각도 없던 날은 늘 비어 있는 강수 줄을 두지 않는다 — 줄이 하나 빠진 만큼 꺾은선 자리도 올린다
+        self.assertIn("wet = rows.some(isWet)", strip)
+        self.assertIn(".hr-strip.dry .hr-names, .hr-strip.dry .hr-col { grid-template-rows: 20px 54px 20px 22px 18px; }", style)
+        self.assertIn(".hr-strip.dry .hr-chart { top: 20px; }", style)
+        # 띠의 왼쪽 끝은 늘 칸 경계에 온다(글자가 반쯤 잘려 보이지 않게): 처음 자리도, 맨 끝까지 민 자리도
+        self.assertIn("/ HOUR_COL) * HOUR_COL)", strip)
+        self.assertIn("scroller.clientWidth % HOUR_COL", strip)
         self.assertIn("값 없음", strip)  # 값이 없는 시각은 칸을 비우고 그렇게 알린다
         self.assertIn("view.strip.left = scroller.scrollLeft", strip)  # 옆으로 민 자리는 다시 그려도 그대로
         self.assertIn('class: "hr-key feel"', strip)  # 선의 뜻은 색만이 아니라 이름표와 선 모양(점선)으로도

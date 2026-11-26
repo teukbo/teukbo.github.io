@@ -13,7 +13,8 @@
      "station": {"stn": "258", "name": "보성군", "km": 11.3},   // 관측소가 max_station_km 안에 없으면 null
      "from": "2026-09-15", "to": "2026-11-25",                  // 특보 이력이 있는 기간(받아 둔 이력의 첫날~마지막 날). 이력이 없으면 null
      "obs_to": "2026-11-24",                                     // 관측값이 있는 마지막 날. 없으면 null
-     "hours": {"from": "2026-11-25", "to": "2026-11-26"},        // 시간별 값이 있는 첫날~마지막 날. 없으면 null
+     "hours": {"from": "2026-11-25", "to": "2026-11-26",         // 시간별 값이 있는 첫날~마지막 날. 없으면 null
+               "source": "…"},                                    // 시간별 값의 출처 글(화면이 그대로 적는다 — 한 달 문서의 source 와 같다)
      "vars": ["temp_min", "temp_max", "rain", "snow_new", "wind_max", "gust_max"],
      "days": {"2026-11-26": {"o": [vars 순서의 값…],             // 그날 관측(관측소 일자료)이 없으면 키가 없다
                               "w": [["strong_wind", "advisory", "2026-11-26T04:00+09:00", "2026-11-26T15:00+09:00"]],   // 특보가 없으면 키가 없다
@@ -282,7 +283,7 @@ def build_region(region: Region, cfg: Config, spans: Mapping[str, Sequence[Span]
         "from": first.isoformat() if first else None,
         "to": last.isoformat() if last else None,
         "obs_to": max(have_obs) if have_obs else None,
-        "hours": {"from": min(have_hours), "to": max(have_hours)} if have_hours else None,
+        "hours": {"from": min(have_hours), "to": max(have_hours), "source": HOURS_SOURCE} if have_hours else None,
         "vars": list(VARS),
         "days": dict(sorted(days.items())),
     }
