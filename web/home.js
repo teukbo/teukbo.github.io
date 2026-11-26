@@ -326,7 +326,11 @@
     }
     // 체감온도(기상청 식: 여름철은 기온·습도, 겨울철은 기온·바람 — teukbo/indicators.py 가 계산해 싣는다). 없으면 그 줄을 뺀다
     const feel = mid("v:feel");
-    if (feel) { out.feel = feel; out.feelMin = peak(feel, -1); out.feelMax = peak(feel, 1); if (feel[at] != null) out.feelNow = feel[at]; }
+    if (feel) {
+      out.feel = feel; out.feelMin = peak(feel, -1); out.feelMax = peak(feel, 1);
+      if (feel[at] != null) out.feelNow = feel[at];
+      out.blocks.forEach((blk) => { blk.feel = feel[blk.at]; });  // 그 시간대가 시작할 때의 체감온도
+    }
     return out;
   }
 
@@ -367,16 +371,20 @@
     const columns = cols.map((b) => {
       const [day, hour] = whenText(b.from).split(" "), value = b.mm || 0, newDay = day !== lastDay;
       lastDay = day;
-      return h("div", { class: "strip-col", title: `${day} ${hour}부터 3시간: 비 ${mm(value)}mm${b.temp == null ? "" : `, 기온 ${Math.round(b.temp)}℃`}` },
+      // 체감온도는 기온과 눈에 띄게 다를 때만 기온 아래에 작게 적는다(같을 때까지 적으면 줄만 늘어난다)
+      const feels = b.temp != null && b.feel != null && Math.abs(b.feel - b.temp) >= FEEL_GAP ? Math.round(b.feel) : null;
+      return h("div", { class: "strip-col", title: `${day} ${hour}부터 3시간: 비 ${mm(value)}mm${b.temp == null ? "" : `, 기온 ${Math.round(b.temp)}℃`}${feels == null ? "" : `, 체감 ${feels}℃`}` },
         h("span", { class: "strip-day", text: newDay ? day : "" }),
         h("span", { class: "strip-hour", text: hour }),
         h("span", { class: "strip-icon" }, value >= 0.1 ? dropIcon(value >= 5 ? 3 : value >= 1 ? 2 : 1) : null),
         h("span", { class: "strip-mm", text: value >= 0.1 ? `${mm(value)}mm` : "" }),
-        h("span", { class: "strip-temp" }, b.temp == null ? null : [h("span", { class: "strip-deg", style: `top:${(y(b.temp) - 22).toFixed(1)}px`, text: `${Math.round(b.temp)}°` }), h("span", { class: "strip-dot", style: `top:${y(b.temp).toFixed(1)}px` })]));
+        h("span", { class: "strip-temp" }, b.temp == null ? null : [h("span", { class: "strip-deg", style: `top:${(y(b.temp) - 22).toFixed(1)}px`, text: `${Math.round(b.temp)}°` }), h("span", { class: "strip-dot", style: `top:${y(b.temp).toFixed(1)}px` })]),
+        h("span", { class: "strip-feel", text: feels == null ? "" : `체감 ${feels}°` }));
     });
+    const anyFeel = cols.some((b) => b.temp != null && b.feel != null && Math.abs(b.feel - b.temp) >= FEEL_GAP);
     const wet = cols.filter((b) => (b.mm || 0) >= 0.1);
     const label = `시간대별 날씨(3시간씩). ${wet.length ? `비: ${wet.map((b) => `${whenText(b.from)}부터 ${mm(b.mm)}mm`).join(", ")}` : "비 없음"}. 기온 ${cols.filter((b) => b.temp != null).map((b) => `${whenText(b.from)} ${Math.round(b.temp)}도`).join(", ")}`;
-    return h("div", { class: "strip", role: "img", "aria-label": label, tabindex: "0" },
+    return h("div", { class: `strip${anyFeel ? " has-feel" : ""}`, role: "img", "aria-label": label, tabindex: "0" },
       h("div", { class: "strip-inner", style: `width:${cols.length * STRIP_COL}px` },
         points ? s("svg", { class: "strip-line", width: String(cols.length * STRIP_COL), height: String(STRIP_CURVE), viewBox: `0 0 ${cols.length * STRIP_COL} ${STRIP_CURVE}`, "aria-hidden": "true" }, s("polyline", { points })) : null,
         columns));

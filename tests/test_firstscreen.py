@@ -142,10 +142,10 @@ class RecordsScreenTest(unittest.TestCase):
         self.assertNotIn("innerHTML", script)  # 받아 온 글은 늘 텍스트로
         names = set(re.findall(r'\["(\w+)", "[^"]+", "[^"]*"\]', script[script.index("const METRIC = {"):script.index("const docs = new Map()")]))
         self.assertTrue(names)
-        self.assertLessEqual(names, set(records.VARS))  # 달력 칸에 적는 값은 기록 파일에 실리는 값뿐
+        self.assertLessEqual(names, set(records.VARS) | {"feel_min", "feel_max"})  # 달력 칸에 적는 값은 기록 파일에 실리는 값뿐(체감온도는 그날의 요약 f 에서)
         for type_id in re.findall(r"(\w+): \[\[", script[script.index("const METRIC = {"):script.index("const docs = new Map()")]):
             self.assertIn(type_id, load_config().thresholds.types, type_id)
-        for needle in ("ctx.types", "ctx.levels", "doc.station", "doc.feel_basis", "navigator.clipboard.writeText", "aria-pressed"):
+        for needle in ("ctx.types", "ctx.levels", "doc.station", "doc.hours", "navigator.clipboard.writeText", "aria-pressed"):
             self.assertIn(needle, script, needle)
         self.assertNotIn("주의보", script)  # 단계 이름은 자료(levels)에서 읽는다
         html = read("index.html")
@@ -158,6 +158,54 @@ class RecordsScreenTest(unittest.TestCase):
         self.assertEqual(local.resolve_path("/data/work_rules.json", web, data), ROOT / "config" / "work_rules.json")
         self.assertIsNone(local.resolve_path("/data/records/../latest.json", web, data))
         self.assertIsNone(local.resolve_path("/data/obs/2026-11.json", web, data))  # 원자료는 내보내지 않는다
+
+
+class HoursScreenTest(unittest.TestCase):
+    """달력에서 날짜를 누르면 그날의 시간대별 체감온도·날씨가 아래에 뜬다(기상청 초단기실황 — 배포 때 만든 지역별 한 달 파일)."""
+
+    def test_day_panel_loads_the_month_file_when_a_day_has_hourly_values(self):
+        script = read("records.js")
+        self.assertIn("data/hours/${encodeURIComponent(id)}/${month}.json", script)
+        block = script[script.index("function renderHours(doc, ctx)"):script.index("function renderDay(doc, ctx)")]
+        self.assertIn("(doc.days[ymd] || {}).h", block)  # 값이 있는 날에만 받는다
+        self.assertIn("loadHours(doc.id, ymd.slice(0, 7), ctx.again)", block)  # 그 달 것을 그때 받고, 받으면 기록 칸만 다시 그린다
+        self.assertIn("doc.hours.from", block)  # 없는 날에는 언제부터 모으는지 적는다
+        self.assertIn("hdoc.source", block)  # 출처는 파일에 실린 글 그대로
+        self.assertIn("관측소 값과 다를 수 있습니다", block)
+        self.assertIn('"이 날 시간별 표 복사(엑셀용)"', block)
+        day = script[script.index("function renderDay(doc, ctx)"):script.index("/** 기록 칸을 그린다.")]
+        self.assertIn("renderHours(doc, ctx)", day)
+        self.assertNotIn("feel", day)  # 하루 관측값 칸에는 체감온도를 적지 않는다(시간대별 칸에서만 — 지점이 다르다)
+
+    def test_feel_temperature_is_shown_as_served_never_recomputed(self):
+        script = read("records.js")
+        for constant in ("13.12", "0.6215", "11.37", "0.3965", "4.8", "0.16", "atan"):
+            self.assertNotIn(constant, script, constant)  # 체감온도 식은 서버(teukbo/indicators.py)에만 있다
+        self.assertIn('hdoc.feel_stat !== "max"', script)  # 어느 쪽 극값을 앞세울지도 파일이 정한다(철을 화면에서 따지지 않는다)
+        self.assertIn("window.TeukboLive.ptyText(pty)", script)  # 강수형태 이름은 실시간 화면과 같은 표에서
+        for word in ("소나기", "빗방울", "눈날림"):
+            self.assertNotIn(word, script, word)
+        self.assertIn('4: "소나기"', read("live.js"))  # 2026-06 가이드에서 초단기에 추가된 코드
+        self.assertNotIn("innerHTML", script)
+
+    def test_strip_keeps_gaps_and_layout_numbers_in_step_with_the_stylesheet(self):
+        script, style = read("records.js"), read("style.css")
+        self.assertIn("const HOUR_COL = 46, HOUR_CURVE = 54;", script)
+        self.assertIn(".hr-col { width: 46px;", style)
+        self.assertIn(".hr-names, .hr-col { display: grid; flex: none; grid-template-rows: 20px 18px 54px 20px 22px 18px;", style)
+        self.assertIn(".hr-chart { position: absolute; top: 38px;", style)  # 시각(20) + 강수(18) 줄 아래가 꺾은선 자리
+        strip = script[script.index("function hourStrip(rows, peak, label, key)"):script.index("function renderHours(doc, ctx)")]
+        self.assertIn("r.hour === last[last.length - 1].hour + 1", strip)  # 이어진 시각끼리만 선으로 잇는다(빈 시각을 건너 잇지 않는다)
+        self.assertIn("값 없음", strip)  # 값이 없는 시각은 칸을 비우고 그렇게 알린다
+        self.assertIn("view.strip.left = scroller.scrollLeft", strip)  # 옆으로 민 자리는 다시 그려도 그대로
+        self.assertIn('class: "hr-key feel"', strip)  # 선의 뜻은 색만이 아니라 이름표와 선 모양(점선)으로도
+
+    def test_forecast_strip_notes_feel_temperature_only_when_it_differs(self):
+        script, style = read("home.js"), read("style.css")
+        strip = script[script.index("function hourStrip(w)"):script.index("/** 날씨 카드")]
+        self.assertIn("Math.abs(b.feel - b.temp) >= FEEL_GAP", strip)
+        self.assertIn('class: "strip-feel"', strip)
+        self.assertIn(".strip.has-feel .strip-line { bottom: 16px; }", style)  # 한 줄이 늘면 기온 선도 같이 올린다
 
 
 class MotionTest(unittest.TestCase):

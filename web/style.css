@@ -1236,6 +1236,42 @@ body.home .records h2 { margin: 0 0 8px; font-size: 17px; }
 .rec-source { margin: 10px 0 0; color: var(--ink-3); font-size: 12px; word-break: keep-all; }
 .records .fold { margin-top: 12px; }
 
+/* 시간대별(달력에서 날짜를 누르면): 요약 · 24시간 띠 · 복사. 띠는 옆으로 밀어 보고, 왼쪽 이름표 칸은 밀리지 않는다.
+   줄 높이는 records.js 의 HOUR_COL(칸 너비)·HOUR_CURVE(꺾은선 칸 높이)와 같게 */
+.hr { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.hr-title { margin: 0; font-size: 15px; font-weight: 700; }
+.hr-title small { color: var(--ink-3); font-size: 12px; font-weight: 400; }
+.rec-fact.strong b { font-size: 18px; }
+.hr-strip { display: flex; margin-top: 12px; }
+.hr-names, .hr-col { display: grid; flex: none; grid-template-rows: 20px 18px 54px 20px 22px 18px; align-items: center; }
+.hr-names { width: 62px; color: var(--ink-2); font-size: 11px; white-space: nowrap; }
+.hr-scroll { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.hr-scroll::-webkit-scrollbar { display: none; }
+.hr-scroll:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 8px; }
+.hr-inner { position: relative; display: flex; }
+.hr-col { width: 46px; justify-items: center; font-variant-numeric: tabular-nums; }
+.hr-hour { color: var(--ink-2); font-size: 12px; }
+.hr-wet { color: var(--series-1); font-size: 10.5px; white-space: nowrap; }
+.hr-temp { color: var(--ink-2); font-size: 12.5px; }
+.hr-feel { font-size: 14px; font-weight: 700; }
+.hr-wind { color: var(--ink-3); font-size: 11.5px; }
+.hr-col.peak { border-radius: 10px; background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55); }
+.hr-col.none .hr-hour { opacity: 0.45; }
+.hr-chart { position: absolute; top: 38px; left: 0; overflow: visible; pointer-events: none; }
+.hr-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hr-line.temp { stroke: rgba(255, 255, 255, 0.55); }
+.hr-line.feel { stroke: var(--series-1); stroke-dasharray: 5 4; }
+.hr-dot.temp { fill: rgba(255, 255, 255, 0.55); }
+.hr-dot.feel { fill: var(--series-1); }
+.hr-key { display: inline-block; width: 14px; margin-right: 4px; border-top: 2px solid rgba(255, 255, 255, 0.55); vertical-align: middle; }
+.hr-key.feel { border-top: 2px dashed var(--series-1); }
+.hr .skeleton { margin-top: 10px; }
+/* 예보 띠(날씨 칸): 체감온도가 기온과 다른 시간대가 있으면 기온 아래에 한 줄을 더 둔다 */
+.strip-feel { display: none; color: var(--series-1); font-size: 10.5px; white-space: nowrap; }
+.strip.has-feel .strip-col { grid-template-rows: 16px 20px 28px 16px 52px 16px; }
+.strip.has-feel .strip-feel { display: block; }
+.strip.has-feel .strip-line { bottom: 16px; }
+
 /* 날씨를 받는 동안의 자리 표시 */
 .skeleton { display: grid; gap: 10px; margin-top: 12px; }
 .skeleton span { height: 14px; border-radius: 7px; background: rgba(255, 255, 255, 0.16); }
