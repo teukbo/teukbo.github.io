@@ -10,14 +10,16 @@
 런너에서 실제 응답으로 확인한 것(2026-11-26, teukbo/check.py 의 check_ncst_history)
 - 가장 최근 기준시각에서 23시간 전까지 값이 온다. 24시간 전부터는 "오류 코드 10 최근 1일 간의 자료만 제공합니다."
   → 수집이 하루 넘게 멈추면 그 사이의 시각은 다시 받을 수 없다(빈 채로 남는다).
-- 같은 기준시각을 다시 물으면 같은 값이 온다. 한 번 호출은 0.45초쯤, 100번에 두어 번은 응답이 오래 멈춘다
+- 지난 기준시각을 연달아 두 번 물으면 같은 값이 온다. 한 번 호출은 0.45~0.8초, 100번에 두어 번은 응답이 오래 멈춘다
   → 이 수집은 짧게 기다리고(timeout_seconds) 한 번만 다시 부른다.
+- 가장 최근 기준시각은 다음 실행으로 미룬다(skip_latest_hours): 진행 중인 시각의 값이 뒤에 바뀌는지는 확인하지 못했다.
 
 저장: data/hourly/YYYY-MM-DD/HH.json  (기준시각의 한국 날짜·시. 커밋하고 지우지 않는다)
     {"schema": 1, "t": "2026-11-26T14:00+09:00", "vars": ["temp", "rh", "wind", "rain", "pty"],
      "grids": {"60,127": [0.8, 81, 2.8, 0.0, 0]},        // "nx,ny" → vars 순서의 값(없으면 null)
      "missing": ["61,128"], "tries": 1}                  // 못 받은 격자가 있을 때만. 다 받았으면 두 키가 없다
-- 다 받은 파일은 다시 쓰지 않는다(저장소가 덜 커진다). 못 받은 격자가 남은 파일만, 조회 가능 기간 안에서 refill_tries 번까지 다시 채운다.
+- 다 받은 파일은 다시 쓰지 않는다(저장소가 덜 커진다). 못 받은 격자가 남은 파일만, 조회 가능 기간 안에서 refill_tries 번까지 다시 채운다
+  (빠진 격자를 모두 물어본 실행만 한 번으로 센다 — 거절·연속 실패·시간 초과·상한으로 끊긴 실행은 세지 않는다).
 - data/hourly/calls.json {"date": "2026-11-26", "calls": 5123} — 오늘 부른 횟수. 하루 상한(daily_call_cap)을 넘기지 않으려고 센다:
   이 서비스의 하루 호출 한도(개발계정 10,000건)를 단기예보 수집과 나눠 쓸 수도 있어, 시간별 실황이 한도를 다 써 버리지 않게 한다.
 
@@ -95,10 +97,14 @@ def load_hour(path: Path) -> dict[str, Any] | None:
     return doc
 
 
-def wanted_hours(now: datetime, max_back_hours: int) -> list[datetime]:
-    """지금 받을 수 있는 정시들 — 오래된 것부터(조회 가능 기간에서 곧 밀려날 것을 먼저 받는다)."""
+def wanted_hours(now: datetime, max_back_hours: int, skip_latest_hours: int = 0) -> list[datetime]:
+    """지금 받을 정시들 — 오래된 것부터(조회 가능 기간에서 곧 밀려날 것을 먼저 받는다).
+
+    skip_latest_hours: 가장 최근 기준시각 몇 개는 건너뛴다. 기상청 가이드는 초단기실황이 '10분마다 최신 정보로 업데이트'된다고 적는데
+    그것이 진행 중인 시각의 값을 바꾸는지는 문서에 없다 — 한 번 받은 파일은 다시 쓰지 않으므로, 시각이 지나 값이 굳은 뒤에 받는다.
+    """
     latest = kma_ultra.base_time(kma_ultra.ncst_bases(now, count=1)[0])
-    return [latest - timedelta(hours=back) for back in range(max(0, int(max_back_hours)), -1, -1)]
+    return [latest - timedelta(hours=back) for back in range(max(0, int(max_back_hours)), max(0, int(skip_latest_hours)) - 1, -1)]
 
 
 def stored_days(data_dir: Path) -> list[str]:
@@ -248,7 +254,7 @@ def run(cfg: Config, now: datetime, data_dir: Path, env: Mapping[str, str], fetc
     done_hours = saved = failed = new_calls = 0
     why = ""
 
-    for t in wanted_hours(now, int(opts["max_back_hours"])):
+    for t in wanted_hours(now, int(opts["max_back_hours"]), int(opts["skip_latest_hours"])):
         path = hour_path(data_dir, t)
         doc = load_hour(path)
         have: dict[str, list[Any]] = dict(doc["grids"]) if doc else {}
@@ -265,9 +271,13 @@ def run(cfg: Config, now: datetime, data_dir: Path, env: Mapping[str, str], fetc
         if room <= 0:
             why = f"오늘 호출 상한({cap}회)에 닿았습니다"
             break
+        asked_all = len(todo) <= room  # 상한 때문에 일부만 묻는 실행은 '채워 본 횟수'로 치지 않는다
         todo = todo[:room]
 
         got, counts, reason = fetch_hour(t, todo, fetch, int(opts["workers"]), deadline, int(opts["stop_after_failures"]))
+        # 빠진 격자를 모두 물어본 실행만 한 번으로 센다: 거절·연속 실패·시간 초과·상한으로 끊긴 실행이 횟수를 깎아 먹으면
+        # 서버가 멀쩡해진 뒤에도 그 시각을 영영 채우지 않게 된다
+        full_try = asked_all and reason == "done"
         calls += counts["calls"]
         new_calls += counts["calls"]
         failed += counts["failed"]
@@ -277,9 +287,9 @@ def run(cfg: Config, now: datetime, data_dir: Path, env: Mapping[str, str], fetc
             out: dict[str, Any] = {"schema": SCHEMA, "t": iso(t.astimezone(KST)), "vars": list(VARS), "grids": {key: have[key] for key in keys if key in have}}
             if missing:
                 out["missing"] = missing
-                out["tries"] = tries + 1 if doc is not None else 0
-            if got or (doc is not None and out.get("tries") != doc.get("tries")):
-                storage.write_json(path, out)
+                out["tries"] = tries + (1 if doc is not None and full_try else 0)
+            if got or (doc is not None and missing and out["tries"] != tries):
+                storage.write_json(path, out)  # 값이 늘었거나, 다 물어봤는데도 못 받아 횟수가 올랐을 때만 다시 쓴다
                 saved += len(got)
             if not missing:
                 done_hours += 1

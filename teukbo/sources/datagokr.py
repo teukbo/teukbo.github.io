@@ -29,7 +29,7 @@ class Rejected(FetchError):
 
 
 REJECTED_CODES = {"20", "21", "22", "30", "31", "32", "33"}  # 접근 거부·일시 사용 불가·한도 초과·미등록 키·기한 만료·미등록 IP·서명 오류
-REJECTED_STATUS = {401, 403, 429}  # 게이트웨이가 HTTP 상태로 거절할 때(teukbo.http 가 FetchError.status 에 싣는다)
+REJECTED_STATUS = {401, 403}  # 게이트웨이가 HTTP 상태로 거절할 때(teukbo.http 가 FetchError.status 에 싣는다). 429 는 초당 한도일 수 있어 넣지 않는다
 
 
 def is_rejected(error: BaseException) -> bool:
@@ -44,7 +44,9 @@ def extract_items(payload: Any, label: str) -> tuple[list[Mapping[str, Any]], in
     gateway = payload.get("OpenAPI_ServiceResponse")
     if gateway:
         head = gateway.get("cmmMsgHeader", {}) if isinstance(gateway, dict) else {}
-        raise Rejected(
+        # 게이트웨이 응답이라도 사유가 키·한도일 때만 '거절'이다. 일시 오류(04 라우팅 오류, 05 시간 초과 등)는 다음에 다시 부를 만하다
+        kind = Rejected if str(head.get("returnReasonCode", "")).zfill(2) in REJECTED_CODES else FetchError
+        raise kind(
             f"{label}: {head.get('errMsg', '게이트웨이 오류')} "
             f"({head.get('returnAuthMsg', '')}, 코드 {head.get('returnReasonCode', '?')})"
         )

@@ -20,8 +20,9 @@ VARIABLES = ("precip", "snow", "temp", "apparent", "rh", "wind", "gust")
 # settings.json 에 값이 없을 때 쓰는 기본값
 DEFAULT_SUMMER_MONTHS = (5, 6, 7, 8, 9)  # feel.summer_months — 여름철 체감온도 식(기온·습도)을 쓰는 달
 DEFAULT_RECORDS = {"since": "2026-09-01", "obs_ready_hour": 11, "max_station_km": 40, "keep_days": 400, "obs_time_budget_seconds": 240, "feel_min_hours": 20}
-DEFAULT_HOURLY = {"enabled": True, "max_back_hours": 23, "workers": 8, "timeout_seconds": 6, "retries": 1, "backoff_seconds": 1,
-                  "time_budget_seconds": 240, "stop_after_failures": 40, "refill_tries": 2, "daily_call_cap": 7000}  # 시간별 실황 수집(teukbo/hourly.py)
+DEFAULT_HOURLY = {"enabled": True, "max_back_hours": 23, "workers": 10, "timeout_seconds": 6, "retries": 1, "backoff_seconds": 1,
+                  "time_budget_seconds": 300, "stop_after_failures": 40, "refill_tries": 2, "daily_call_cap": 7000,
+                  "skip_latest_hours": 1, "local": False}  # 시간별 실황 수집(teukbo/hourly.py)
 
 
 class ConfigError(ValueError):
@@ -424,6 +425,8 @@ def load_settings(path: Path | None = None) -> Settings:
     except ValueError as e:
         raise ConfigError("settings.json records: since 는 YYYY-MM-DD 날짜여야 합니다") from e
     hourly = {**DEFAULT_HOURLY, **{k: v for k, v in (data.get("hourly") or {}).items() if not k.startswith("_")}}
+    if not 0 <= int(hourly["skip_latest_hours"]) <= int(hourly["max_back_hours"]):
+        raise ConfigError("settings.json hourly: skip_latest_hours 는 0 이상 max_back_hours 이하여야 합니다")
     if not 0 <= int(hourly["max_back_hours"]) <= 23:
         raise ConfigError("settings.json hourly: max_back_hours 는 0~23 이어야 합니다(초단기실황은 최근 1일치만 조회된다)")
     if int(hourly["workers"]) < 1 or int(hourly["daily_call_cap"]) < 0:

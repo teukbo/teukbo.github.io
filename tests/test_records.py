@@ -356,6 +356,29 @@ class HoursTest(unittest.TestCase):
         self.assertIn("2026-11-18", doc["days"])  # 특보 기록은 그대로
         self.assertIsNone(doc["hours"])
 
+    def test_one_broken_day_does_not_drop_the_other_days(self):
+        self.fill_day(2026, 11, 25)
+        self.fill_day(2026, 11, 26)
+        storage.write_json(hourly.hour_path(self.dir, kst(2026, 11, 25, 3)), {"schema": 1, "t": "x", "vars": list(hourly.VARS), "grids": {self.key: 7}})  # 값이 목록이 아니다
+        summary = records.build_hours(CFG, self.dir, self.out)["beolgyo"]
+        self.assertEqual(list(summary), ["2026-11-26"])  # 어긋난 날만 빠진다
+        self.assertEqual(list(self.month()["days"]), ["2026-11-26"])
+
+    def test_failed_hourly_part_leaves_no_month_files_behind(self):
+        write_events(self.dir, {"20261126": []})
+        self.fill_day(2026, 11, 26)
+        out = Path(tempfile.mkdtemp()) / "records"
+        real = records.build_hours
+
+        def half_done(cfg, data_dir, out_dir=None):
+            real(cfg, data_dir, out_dir)
+            raise RuntimeError("쓰다가 오류")
+
+        with mock.patch.object(records, "build_hours", half_done):
+            records.write_site_records(CFG, self.dir, out, STATIONS, hours_dir=self.out)
+        self.assertFalse(self.out.exists())  # 요약 없이 남은 달 파일은 치운다
+        self.assertTrue((out / "beolgyo.json").is_file())
+
     def test_local_mode_serves_month_files_only(self):
         from teukbo import local
 

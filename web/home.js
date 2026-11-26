@@ -864,7 +864,8 @@
   function renderRecords(fresh) {
     const region = regionOf(state.region);
     $("records-title").textContent = `특보 기록${state.type ? ` · ${typeName(state.type)}` : ""}${region ? ` · ${region.name}` : ""}`;
-    Records.render($("records-body"), { region: region ? { id: region.id, name: region.name } : null, type: state.type, types: state.latest.types, levels: state.latest.levels, again: () => renderRecords(false), fresh, fold });
+    Records.render($("records-body"), { region: region ? { id: region.id, name: region.name } : null, type: state.type, types: state.latest.types, levels: state.latest.levels, again: () => renderRecords(false), fresh, fold,
+      stamp: state.base.generated_at });  // 계산 시각이 바뀌면(3시간마다) 기록·시간별 파일도 뒤에서 다시 받는다
   }
 
   // ------------------------------------------------------------ 머리말 · 전체

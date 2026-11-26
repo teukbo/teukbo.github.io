@@ -89,7 +89,8 @@ jobs:
         run: python3 -m teukbo.obs
 
       - name: 시간별 실황 이어 받기 (기상청 초단기실황 — 지역별 기록의 '시간대별 체감온도·날씨')
-        if: ${{ steps.due.outputs.run == 'true' }}
+        # 앞 단계(수집·계산)가 실패한 회차에도 받는다: 최근 23시간까지만 조회되는 자료라, 주 수집이 여러 번 실패하는 동안 놓치면 되찾을 수 없다.
+        if: ${{ !cancelled() && steps.due.outputs.run == 'true' }}
         # 못 받아도 기상 수집·배포는 계속한다. 최근 23시간까지만 조회되므로 오래된 시각부터 받고, 한 번 실행에 쓰는 시간과 하루 호출 수에 상한을 둔다(settings.json 의 hourly).
         continue-on-error: true
         timeout-minutes: 7
@@ -99,7 +100,8 @@ jobs:
         run: python3 -m teukbo.hourly
 
       - name: 이력 커밋
-        if: ${{ steps.due.outputs.run == 'true' }}
+        # 수집·계산이 실패한 회차에도 그동안 받은 것(시간별 실황 등)은 올린다. 작업 자체는 실패로 남고 배포는 하지 않는다.
+        if: ${{ !cancelled() && steps.due.outputs.run == 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

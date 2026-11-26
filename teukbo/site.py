@@ -94,6 +94,7 @@ def build_records(data_dir: Path, out_dir: Path) -> int:
     except Exception:  # noqa: BLE001 — 기록 때문에 배포가 멈추면 안 된다
         log.exception("지역별 기록을 만들지 못했습니다 — 기록 없이 사이트를 조립합니다.")
         shutil.rmtree(out_dir, ignore_errors=True)  # 쓰다 만 파일을 남기지 않는다
+        shutil.rmtree(out_dir.parent / "hours", ignore_errors=True)  # 기록 없이는 화면이 시간별 파일을 읽지 않는다
         return 0
 
 

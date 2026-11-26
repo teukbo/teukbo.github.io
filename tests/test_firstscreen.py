@@ -167,8 +167,9 @@ class HoursScreenTest(unittest.TestCase):
         script = read("records.js")
         self.assertIn("data/hours/${encodeURIComponent(id)}/${month}.json", script)
         block = script[script.index("function renderHours(doc, ctx)"):script.index("function renderDay(doc, ctx)")]
-        self.assertIn("(doc.days[ymd] || {}).h", block)  # 값이 있는 날에만 받는다
-        self.assertIn("loadHours(doc.id, ymd.slice(0, 7), ctx.again)", block)  # 그 달 것을 그때 받고, 받으면 기록 칸만 다시 그린다
+        self.assertIn("count = day.h || 0;", block)  # 값이 있는 날에만 받는다
+        self.assertLess(block.index("if (!count) return"), block.index("loadHours("))
+        self.assertIn("loadHours(doc.id, ymd.slice(0, 7), ctx)", block)  # 그 달 것을 그때 받고, 받으면 기록 칸만 다시 그린다
         self.assertIn("doc.hours.from", block)  # 없는 날에는 언제부터 모으는지 적는다
         self.assertIn("hdoc.source", block)  # 출처는 파일에 실린 글 그대로
         self.assertIn("관측소 값과 다를 수 있습니다", block)
@@ -176,6 +177,53 @@ class HoursScreenTest(unittest.TestCase):
         day = script[script.index("function renderDay(doc, ctx)"):script.index("/** 기록 칸을 그린다.")]
         self.assertIn("renderHours(doc, ctx)", day)
         self.assertNotIn("feel", day)  # 하루 관측값 칸에는 체감온도를 적지 않는다(시간대별 칸에서만 — 지점이 다르다)
+
+    def test_daily_feel_extremes_come_only_from_the_served_summary(self):
+        # 받은 시각이 모자란 날(수집 첫날, 오늘, 수집이 멈췄던 날)에 받은 시각만으로 '그날의 체감 최저'를 내세우지 않는다:
+        # 서버가 실어 준 f 가 있을 때만 그 값·시각을 그대로 적고, 없으면 '받은 시각 중'이라고 이름을 바꾼다. 문턱 숫자는 화면에 없다.
+        script = read("records.js")
+        block = script[script.index("function renderHours(doc, ctx)"):script.index("function renderDay(doc, ctx)")]
+        self.assertIn("Array.isArray(day.f) && day.f.length === 4", block)
+        self.assertIn("const [lo, loHour, hi, hiHour] = day.f", block)
+        self.assertIn("받은 시각 중 가장", block)
+        self.assertIn("받은 시각이 모자라 그날 전체의 체감 최저·최고는 적지 않습니다.", block)
+        self.assertNotIn("feel_min_hours", script)
+        self.assertNotRegex(block, r"[<>]=?\s*(19|20)\b")  # 20시각 문턱을 화면에서 다시 따지지 않는다
+        self.assertIn("kinds.get(name).push(r.hour)", block)  # 강수는 형태 이름별로 시각을 묶는다(비·눈이 섞인 날을 한 이름으로 부르지 않는다)
+
+    def test_days_stay_reachable_when_the_warning_history_lags(self):
+        script = read("records.js")
+        self.assertIn("const ends = [doc.to, doc.obs_to, doc.hours && doc.hours.to].filter(Boolean).sort();", script)
+        body = script[script.index("  function render(box, ctx) {"):script.index("  return { render };")]
+        self.assertIn("inRange = ymd >= span.from && ymd <= span.to", body)  # 특보 이력이 늦거나 없어도 값이 있는 날은 누를 수 있다
+        self.assertIn("monthsOf(span)", body)
+        self.assertIn("이 날의 특보 이력은 아직 받지 못했습니다.", script)  # '없음'과 '모름'을 가른다
+        self.assertIn("if (!warnKnown(doc, ymd)) continue;", body)  # 이 달의 특보 일수는 이력을 받아 둔 날만 센다
+        self.assertIn('"이력 없음"', script)  # 복사한 표에서도 빈칸(= 특보 없음)과 구별된다
+
+    def test_loaded_files_retry_after_failure_and_refresh_with_new_data(self):
+        script, home = read("records.js"), read("home.js")
+        cache = script[script.index("function cached(store, key, url, ctx, relevant)"):script.index("const load = (id, ctx)")]
+        self.assertIn("entry.stamp !== ctx.stamp", cache)  # 계산 시각이 바뀌면 다시 받는다(열어 둔 탭에서 오늘의 시간대별이 멈추지 않게)
+        self.assertIn("if (doc != null || entry.doc == null) entry.doc = doc;", cache)  # 다시 받기에 실패해도 가지고 있던 것은 버리지 않는다
+        self.assertIn("if (relevant()) ctx.again();", cache)  # 다른 지역·달로 옮긴 뒤에 온 응답은 화면을 건드리지 않는다
+        self.assertIn("stamp: state.base.generated_at", home)
+        self.assertIn("onclick: () => { retryFailed(); view.day", script)  # 못 받은 것은 날짜를 다시 누르면 한 번 더 받는다
+        self.assertIn("entry.doc === null && !entry.busy", script)
+
+    def test_redraw_keeps_focus_and_cells_are_named_for_screen_readers(self):
+        script = read("records.js")
+        body = script[script.index("  function render(box, ctx) {"):script.index("  return { render };")]
+        self.assertIn('active.getAttribute("data-focus")', body)
+        self.assertIn("again.focus({ preventScroll: true })", body)
+        for key in ('"data-focus": `day:${ymd}`', '"data-focus": "prev"', '"data-focus": "next"', '"data-focus": "copy-month"'):
+            self.assertIn(key, body, key)
+        strip = script[script.index("function hourStrip(rows, peak, label, key)"):script.index("function renderHours(doc, ctx)")]
+        self.assertIn('h("span", { class: "sr-only", text: said })', strip)  # 칸마다 이름을 붙인 한 줄 글
+        self.assertIn('"aria-hidden": "true", text })', strip)  # 보이는 숫자는 따로 읽지 않는다
+        self.assertIn('role: "region"', strip)
+        self.assertIn('"data-focus": "hours"', strip)
+        self.assertIn("view.copied.where === where", script)  # 복사 알림은 그 날·그 달의 단추 옆에만
 
     def test_feel_temperature_is_shown_as_served_never_recomputed(self):
         script = read("records.js")

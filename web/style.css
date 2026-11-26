@@ -1212,6 +1212,9 @@ body.home .records h2 { margin: 0 0 8px; font-size: 17px; }
 .cal-day.lv-warning { background: rgba(224, 72, 72, 0.28); }
 .cal-day.lv-severe { background: rgba(176, 74, 216, 0.32); }
 .cal-day.picked { border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+.cal-day { position: relative; }
+.cal-dot { position: absolute; top: 6px; right: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--series-1); }
+.cal-dot.key { position: static; display: inline-block; margin-right: 5px; vertical-align: 2px; }
 .lv-advisory > .cal-tag, .rec-tag.lv-advisory, .rec-swatch.lv-advisory { background: #f4c84a; color: #1c1500; }
 .lv-warning > .cal-tag, .rec-tag.lv-warning, .rec-swatch.lv-warning { background: #e04848; color: #fff; }
 .lv-severe > .cal-tag, .rec-tag.lv-severe, .rec-swatch.lv-severe { background: #b04ad8; color: #fff; }
@@ -1254,7 +1257,7 @@ body.home .records h2 { margin: 0 0 8px; font-size: 17px; }
 .hr-inner { position: relative; display: flex; }
 .hr-col { width: 46px; justify-items: center; font-variant-numeric: tabular-nums; }
 .hr-hour { color: var(--ink-2); font-size: 12px; }
-.hr-wet { color: var(--series-1); font-size: 10.5px; white-space: nowrap; }
+.hr-wet { max-width: 100%; overflow: hidden; color: var(--series-1); font-size: 11px; white-space: nowrap; }
 .hr-temp { color: var(--ink-2); font-size: 12.5px; white-space: nowrap; }
 .hr-feel { font-size: 13.5px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
 .hr-wind { color: var(--ink-3); font-size: 11.5px; }

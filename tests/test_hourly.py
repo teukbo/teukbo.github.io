@@ -15,7 +15,8 @@ from teukbo.sources import datagokr, kma_ultra
 from .helpers import config, kst
 
 FULL = config()
-CFG = dataclasses.replace(FULL, regions=FULL.regions[:6])  # 격자 6곳이면 충분하다
+# 격자 6곳이면 충분하다. 가장 최근 시각을 미루는 설정(skip_latest_hours)은 꺼 두고 따로 확인한다 — 아래 검사들이 '07시까지 받는다'로 읽히게
+CFG = dataclasses.replace(FULL, regions=FULL.regions[:6], settings=dataclasses.replace(FULL.settings, hourly={**FULL.settings.hourly, "skip_latest_hours": 0}))
 GRIDS = sorted({(r.nx, r.ny) for r in CFG.regions})
 KEYS = [hourly.grid_key(g) for g in GRIDS]
 ENV = {"DATA_GO_KR_SERVICE_KEY": "test-key"}
@@ -53,6 +54,17 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(hours[0], LATEST - timedelta(hours=23))  # 23시간 전까지(24시간 전은 조회되지 않는다)
         self.assertEqual(hours, sorted(hours))
         self.assertEqual(hourly.wanted_hours(NOW, 0), [LATEST])
+
+    def test_the_latest_hour_waits_for_the_next_run_by_default(self):
+        # 진행 중인 시각의 값이 뒤에 바뀌는지 기상청 문서에 없다 — 한 번 받은 파일은 다시 쓰지 않으므로 값이 굳은 뒤에 받는다
+        self.assertEqual(FULL.settings.hourly["skip_latest_hours"], 1)
+        hours = hourly.wanted_hours(NOW, 23, 1)
+        self.assertEqual((hours[0], hours[-1], len(hours)), (LATEST - timedelta(hours=23), LATEST - timedelta(hours=1), 23))
+        fetch = FakeNcst()
+        hourly.run(dataclasses.replace(CFG, settings=FULL.settings), NOW, Path(tempfile.mkdtemp()), ENV, fetch)
+        self.assertNotIn(LATEST, {base for base, _ in fetch.calls})
+        later = hourly.wanted_hours(NOW + timedelta(hours=3), 23, 1)
+        self.assertIn(LATEST, later)  # 3시간 뒤 실행이 받는다(조회 가능 기간 안)
 
     def test_settings_refuse_a_window_the_api_does_not_serve(self):
         from teukbo.config import ConfigError, load_settings
@@ -134,6 +146,28 @@ class RunTest(unittest.TestCase):
             asked.append(sum(1 for base, grid in fetch.calls if grid == hole and base == LATEST))
         self.assertEqual(asked, [1, 1, 1, 0, 0])  # 처음 한 번 + refill_tries(2)번
         self.assertEqual(hourly.load_hour(hourly.hour_path(self.dir, LATEST))["tries"], 2)
+
+    def test_runs_cut_short_do_not_use_up_the_refill_tries(self):
+        # 거절·연속 실패·하루 상한으로 끊긴 실행이 '채워 본 횟수'를 깎아 먹으면, 서버가 멀쩡해진 뒤에도 그 시각을 영영 채우지 않게 된다
+        half = set(GRIDS[:3])
+        one_hour = cfg_with(max_back_hours=0, workers=1)
+        hourly.run(one_hour, NOW, self.dir, ENV, FakeNcst(lambda base, grid: None if grid in half else (_ for _ in ()).throw(datagokr.NoData("자료 없음"))))
+        path = hourly.hour_path(self.dir, LATEST)
+        self.assertEqual((len(hourly.load_hour(path)["missing"]), hourly.load_hour(path)["tries"]), (3, 0))
+        before = path.stat().st_mtime_ns
+        for _ in range(4):  # 한 번 부르자마자 거절되는 실행이 이어진다
+            hourly.run(one_hour, NOW, self.dir, ENV, FakeNcst(lambda base, grid: (_ for _ in ()).throw(datagokr.Rejected("오류 코드 22"))))
+        for _ in range(4):  # 연달아 실패해 멈추는 실행
+            hourly.run(cfg_with(max_back_hours=0, workers=1, stop_after_failures=2), NOW, self.dir, ENV, FakeNcst(lambda base, grid: (_ for _ in ()).throw(FetchError("TimeoutError"))))
+        self.assertEqual(hourly.load_hour(path)["tries"], 0)
+        self.assertEqual(path.stat().st_mtime_ns, before)  # 달라진 것이 없으면 파일도 다시 쓰지 않는다
+        capped = cfg_with(max_back_hours=0, workers=1, daily_call_cap=hourly._calls_today(self.dir, "2026-11-26") + 1)
+        hourly.run(capped, NOW, self.dir, ENV, FakeNcst())  # 상한 때문에 한 곳만 묻는 실행: 값은 늘지만 횟수는 그대로
+        self.assertEqual((len(hourly.load_hour(path)["missing"]), hourly.load_hour(path)["tries"]), (2, 0))
+        healthy = FakeNcst()
+        hourly.run(cfg_with(max_back_hours=0, workers=1, daily_call_cap=10**6), NOW, self.dir, ENV, healthy)
+        self.assertEqual(len(healthy.calls), 2)  # 서버가 멀쩡해지면 남은 곳을 마저 받는다
+        self.assertNotIn("missing", hourly.load_hour(path))
 
     def test_values_all_missing_count_as_no_data(self):
         self.run_once(FakeNcst(lambda base, grid: {"temp": None, "rain": None, "wind": None, "wdir": None, "rh": None, "pty": None} if grid == GRIDS[1] else None))
@@ -262,18 +296,51 @@ class FetchTest(unittest.TestCase):
         for code in ("22", "30"):
             with self.assertRaises(datagokr.Rejected):
                 datagokr.extract_items(header(code), "초단기실황")
-        with self.assertRaises(datagokr.Rejected):
-            datagokr.extract_items({"OpenAPI_ServiceResponse": {"cmmMsgHeader": {"errMsg": "SERVICE ERROR", "returnAuthMsg": "SERVICE_KEY_IS_NOT_REGISTERED_ERROR", "returnReasonCode": "30"}}}, "초단기실황")
+        def gateway(code, msg):
+            return {"OpenAPI_ServiceResponse": {"cmmMsgHeader": {"errMsg": "SERVICE ERROR", "returnAuthMsg": msg, "returnReasonCode": code}}}
+
+        for code, msg in (("30", "SERVICE_KEY_IS_NOT_REGISTERED_ERROR"), ("22", "LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR")):
+            with self.assertRaises(datagokr.Rejected):
+                datagokr.extract_items(gateway(code, msg), "초단기실황")
+        for code, msg in (("04", "HTTP ROUTING ERROR"), ("05", "SERVICE TIME OUT"), ("4", "HTTP ROUTING ERROR")):  # 게이트웨이의 일시 오류는 다시 부를 만하다
+            try:
+                datagokr.extract_items(gateway(code, msg), "초단기실황")
+                self.fail("오류가 나야 한다")
+            except FetchError as e:
+                self.assertFalse(datagokr.is_rejected(e), code)
         try:
             datagokr.extract_items(header("99", "기타"), "초단기실황")
         except FetchError as e:
             self.assertFalse(datagokr.is_rejected(e))  # 그 밖의 오류는 다음에 다시 불러 볼 만하다
             self.assertNotIsInstance(e, (datagokr.OutOfRange, datagokr.NoData))
         self.assertTrue(datagokr.is_rejected(FetchError("HTTP 403", status=403)))
-        self.assertTrue(datagokr.is_rejected(FetchError("HTTP 429", status=429)))
+        self.assertFalse(datagokr.is_rejected(FetchError("HTTP 429", status=429)))  # 초당 한도일 수 있다 — 한 번으로 실행을 멈추지 않는다
         self.assertFalse(datagokr.is_rejected(FetchError("TimeoutError")))
         for kind in (datagokr.OutOfRange, datagokr.Rejected, datagokr.NoData):
             self.assertTrue(issubclass(kind, FetchError))  # 기존 호출부는 FetchError 로 잡는다
+
+    def test_one_transient_gateway_error_does_not_stop_the_run(self):
+        calls = []
+
+        def fetch(base, grid):
+            calls.append(grid)
+            if len(calls) == 3:
+                datagokr.extract_items({"OpenAPI_ServiceResponse": {"cmmMsgHeader": {"errMsg": "SERVICE ERROR", "returnAuthMsg": "HTTP ROUTING ERROR", "returnReasonCode": "04"}}}, "초단기실황")
+            return {"temp": 1.0, "rain": 0.0, "wind": 1.0, "wdir": 0, "rh": 50, "pty": 0}
+
+        out = Path(tempfile.mkdtemp())
+        hourly.run(cfg_with(max_back_hours=1, workers=1), NOW, out, ENV, fetch)
+        self.assertEqual(len(calls), 2 * len(GRIDS))  # 한 번의 일시 오류 뒤에도 끝까지 받는다
+        self.assertEqual(len(hourly.load_day(out, "2026-11-26")), 2)
+
+    def test_local_mode_does_not_collect_unless_asked(self):
+        from teukbo import local
+
+        self.assertIs(FULL.settings.hourly["local"], False)  # 같은 인증키로 PC 에서도 받으면 하루 호출 한도를 두 배로 쓴다
+        source = (Path(local.__file__)).read_text(encoding="utf-8")
+        block = source[source.index("def records_once("):source.index("# ---------------------------------------------------------------- 공개 사이트 갱신 신호")]
+        self.assertIn('if cfg.settings.hourly.get("local"):', block)
+        self.assertLess(block.index('if cfg.settings.hourly.get("local"):'), block.index("hourly.run(cfg, now, data_dir, env)"))
 
     def test_workflow_runs_the_step_without_blocking_the_main_collection(self):
         from teukbo.config import ROOT
@@ -281,6 +348,9 @@ class FetchTest(unittest.TestCase):
         text = (ROOT / ".github" / "workflows" / "collect.yml").read_text(encoding="utf-8")
         step = text[text.index("시간별 실황 이어 받기"):text.index("- name: 이력 커밋")]
         self.assertIn("continue-on-error: true", step)
+        self.assertIn("if: ${{ !cancelled() && steps.due.outputs.run == 'true' }}", step)  # 주 수집이 실패한 회차에도 받는다(23시간이 지나면 되찾을 수 없다)
+        commit = text[text.index("- name: 이력 커밋"):text.index("- name: 사이트 조립")]
+        self.assertIn("if: ${{ !cancelled() && steps.due.outputs.run == 'true' }}", commit)
         self.assertIn("run: python3 -m teukbo.hourly", step)
         self.assertIn("DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}", step)
         self.assertLess(text.index("run: python3 -m teukbo.run"), text.index("run: python3 -m teukbo.hourly"))  # 주 수집이 먼저

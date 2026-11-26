@@ -277,7 +277,8 @@ def records_once(cfg: Config, data_dir: Path, env: Mapping[str, str]) -> None:
 
         now = now_kst().replace(second=0, microsecond=0)
         obs.run(cfg, now, data_dir, env)
-        hourly.run(cfg, now, data_dir, env)  # 시간별 실황(최근 23시간까지 — 이 컴퓨터가 켜져 있던 동안의 것만 쌓인다)
+        if cfg.settings.hourly.get("local"):  # 기본은 받지 않는다: 공개 사이트의 수집과 같은 인증키를 쓰면 하루 호출 한도를 두 배로 쓴다
+            hourly.run(cfg, now, data_dir, env)
         records.write_site_records(cfg, data_dir, data_dir / "records", hours_dir=data_dir / "hours")
     except Exception as e:  # noqa: BLE001
         print(f"  특보 기록: 만들지 못했습니다 ({type(e).__name__}: {e})")

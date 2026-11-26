@@ -18,12 +18,12 @@
      "days": {"2026-11-26": {"o": [vars 순서의 값…],             // 그날 관측(관측소 일자료)이 없으면 키가 없다
                               "w": [["strong_wind", "advisory", "2026-11-26T04:00+09:00", "2026-11-26T15:00+09:00"]],   // 특보가 없으면 키가 없다
                               "h": 24,                             // 시간별 값이 있는 시각 수. 없으면 키가 없다
-                              "f": [-2.1, 6, 9.8, 14]}}}           // 체감온도 [최저, 그 시, 최고, 그 시] — 시간별 값이 feel_min_hours 시각 이상일 때만
+                              "f": [-2.1, 6, 9.8, 14]}}}           // 체감온도 [최저, 그 시, 최고, 그 시] — 체감온도가 있는 시각이 feel_min_hours 이상일 때만
 
 - w: 그날(한국 시각 0~24시)에 한순간이라도 발효 중이던 특보 [종류 id, 단계 id, 발효 시각, 해제 시각]. 아직 해제되지 않았으면 해제 시각이 null.
   thresholds.json 의 types 에 없는 종류(건조·풍랑 등)는 싣지 않는다. 이력을 받기 시작하기 전에 발표된 특보는 알 수 없다.
 - o: 값은 소수 1자리, 없으면 null. 강수량(rain)·신적설(snow_new)은 그날 관측이 있는데 값이 비어 있으면 0(기록되지 않음 = 없음).
-- f: 그날의 체감온도 최저·최고는 시간별 실황으로만 구한다. 하루 단위 관측값(최저기온·평균풍속)으로 어림하던 값은 싣지 않는다 —
+- f: 그날의 체감온도 최저·최고는 시간별 실황으로만 구하고, 체감온도가 있는 시각이 feel_min_hours 이상인 날에만 싣는다. 하루 단위 관측값(최저기온·평균풍속)으로 어림하던 값은 싣지 않는다 —
   가장 추운 새벽에는 바람이 약한데 하루 평균 풍속을 넣으면 실제보다 낮게 나온다(보성군 2026-11-24: 어림값 -4.1℃, 정시별 실제 최저 -1.5℃).
 - 날은 특보 이력이 있는 기간 안에서 최근 keep_days 일만 싣는다(이력이 없으면 관측값·시간별 값만).
 
@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import math
+import shutil
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -210,19 +211,22 @@ def build_hours(cfg: Config, data_dir: Path, out_dir: Path | None = None) -> dic
         summer = int(month[5:7]) in cfg.settings.feel_summer_months
         docs: dict[str, dict[str, Any]] = {}
         for day in (d for d in days if d.startswith(month)):
-            by_hour = hourly_store.load_day(data_dir, day)
-            if not by_hour:
+            try:
+                by_hour = hourly_store.load_day(data_dir, day)
+                found = []
+                for region, key in regions:
+                    hours, values = day_hours(by_hour, key, summer)
+                    if hours:
+                        found.append((region.id, hours, values, feel_extremes(hours, values, int(opts["feel_min_hours"]))))
+            except Exception:  # noqa: BLE001 — 한 날의 파일이 어긋나도 다른 날의 값까지 버리지 않는다
+                log.exception("시간별 값 %s: 읽는 중 오류 — 이 날만 건너뜁니다.", day)
                 continue
-            for region, key in regions:
-                hours, values = day_hours(by_hour, key, summer)
-                if not hours:
-                    continue
-                docs.setdefault(region.id, {})[day] = {"h": hours, "v": values}
+            for region_id, hours, values, extremes in found:
+                docs.setdefault(region_id, {})[day] = {"h": hours, "v": values}
                 entry: dict[str, Any] = {"h": len(hours)}
-                extremes = feel_extremes(hours, values, int(opts["feel_min_hours"]))
                 if extremes is not None:
                     entry["f"] = extremes
-                summary.setdefault(region.id, {})[day] = entry
+                summary.setdefault(region_id, {})[day] = entry
         if out_dir is None:
             continue
         for region, _ in regions:
@@ -307,6 +311,8 @@ def write_site_records(cfg: Config, data_dir: Path, out_dir: Path, stations: Seq
     except Exception:  # noqa: BLE001 — 시간별 값 때문에 달력까지 비면 안 된다
         log.exception("시간별 한 달 파일을 만들지 못했습니다 — 기록은 시간별 요약 없이 만듭니다.")
         hours = {}
+        if hours_dir is not None:
+            shutil.rmtree(hours_dir, ignore_errors=True)  # 요약 없이 남은 달 파일은 화면이 읽지 않는다
     docs = build_all(cfg, data_dir, stations, hours)
     for doc in docs:
         storage.write_json(out_dir / f"{doc['id']}.json", doc)
