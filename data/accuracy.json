@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-27T17:25+09:00",
+  "updated_at": "2026-11-27T20:25+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-27T17:25+09:00",
-    "runs": 146,
+    "to": "2026-11-27T20:25+09:00",
+    "runs": 147,
     "window_days": 365
   },
   "lead_hours": [
@@ -13,24 +13,24 @@
     24
   ],
   "horizon_hours": 48,
-  "events": 208,
+  "events": 211,
   "capture": {
     "12": {
-      "events": 208,
-      "captured": 137,
-      "rate": 0.659
+      "events": 211,
+      "captured": 140,
+      "rate": 0.664
     },
     "24": {
-      "events": 208,
-      "captured": 141,
-      "rate": 0.678
+      "events": 211,
+      "captured": 144,
+      "rate": 0.682
     }
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 6681,
-      "false": 4680,
-      "rate": 0.7
+      "alerts": 6754,
+      "false": 4743,
+      "rate": 0.702
     },
     "high": {
       "alerts": 882,
@@ -69,24 +69,24 @@
     },
     "strong_wind": {
       "name": "강풍",
-      "events": 153,
+      "events": 156,
       "capture": {
         "12": {
-          "events": 153,
-          "captured": 97,
-          "rate": 0.634
+          "events": 156,
+          "captured": 100,
+          "rate": 0.641
         },
         "24": {
-          "events": 153,
-          "captured": 104,
-          "rate": 0.68
+          "events": 156,
+          "captured": 107,
+          "rate": 0.686
         }
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 4712,
-          "false": 3131,
-          "rate": 0.664
+          "alerts": 4785,
+          "false": 3194,
+          "rate": 0.668
         },
         "high": {
           "alerts": 576,
@@ -153,6 +153,33 @@
     }
   },
   "recent_events": [
+    {
+      "region": "L1022310",
+      "hazard": "strong_wind_advisory",
+      "time": "2026-11-27T18:10+09:00",
+      "grades": {
+        "12": "caution",
+        "24": "caution"
+      }
+    },
+    {
+      "region": "L1022210",
+      "hazard": "strong_wind_advisory",
+      "time": "2026-11-27T18:10+09:00",
+      "grades": {
+        "12": "high",
+        "24": "high"
+      }
+    },
+    {
+      "region": "L1022110",
+      "hazard": "strong_wind_advisory",
+      "time": "2026-11-27T18:10+09:00",
+      "grades": {
+        "12": "caution",
+        "24": "high"
+      }
+    },
     {
       "region": "L1022920",
       "hazard": "strong_wind_advisory",
@@ -304,33 +331,6 @@
       "grades": {
         "12": "low",
         "24": "low"
-      }
-    },
-    {
-      "region": "L1022720",
-      "hazard": "strong_wind_advisory",
-      "time": "2026-11-25T13:00+09:00",
-      "grades": {
-        "12": "caution",
-        "24": "caution"
-      }
-    },
-    {
-      "region": "L1022520",
-      "hazard": "strong_wind_advisory",
-      "time": "2026-11-25T13:00+09:00",
-      "grades": {
-        "12": "caution",
-        "24": "caution"
-      }
-    },
-    {
-      "region": "L1022420",
-      "hazard": "strong_wind_advisory",
-      "time": "2026-11-25T13:00+09:00",
-      "grades": {
-        "12": "low",
-        "24": "caution"
       }
     }
   ]
