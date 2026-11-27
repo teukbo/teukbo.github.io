@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-28T02:25+09:00",
+  "updated_at": "2026-11-28T05:25+09:00",
   "basis": "model_grade",
   "period": {
     "from": "2026-11-12T22:38+09:00",
-    "to": "2026-11-28T02:25+09:00",
-    "runs": 149,
+    "to": "2026-11-28T05:25+09:00",
+    "runs": 150,
     "window_days": 365
   },
   "lead_hours": [
@@ -28,9 +28,9 @@
   },
   "false_alarm": {
     "caution_or_higher": {
-      "alerts": 6779,
-      "false": 4765,
-      "rate": 0.703
+      "alerts": 6808,
+      "false": 4791,
+      "rate": 0.704
     },
     "high": {
       "alerts": 882,
@@ -84,9 +84,9 @@
       },
       "false_alarm": {
         "caution_or_higher": {
-          "alerts": 4810,
-          "false": 3216,
-          "rate": 0.669
+          "alerts": 4839,
+          "false": 3242,
+          "rate": 0.67
         },
         "high": {
           "alerts": 576,
